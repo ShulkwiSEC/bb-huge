@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if finding else 'Add' }} Finding{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/easymde/2.18.0/easymde.min.css">
+<style>
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media(max-width:600px) {
+    .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+  }
+  .section-divider {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .5px; font-weight: 600;
+    padding: 8px 0; margin: 20px 0 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* EasyMDE dark theme overrides */
+  .EasyMDEContainer .CodeMirror {
+    background: var(--bg3) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+    font-family: var(--mono) !important;
+    font-size: 13px !important;
+  }
+  .EasyMDEContainer .editor-toolbar {
+    background: var(--bg2) !important;
+    border-color: var(--border) !important;
+  }
+  .EasyMDEContainer .editor-toolbar button {
+    color: var(--muted) !important;
+  }
+  .EasyMDEContainer .editor-toolbar button:hover,
+  .EasyMDEContainer .editor-toolbar button.active {
+    background: var(--bg3) !important;
+    color: var(--accent2) !important;
+  }
+  .EasyMDEContainer .editor-preview {
+    background: var(--bg2) !important;
+    color: var(--text) !important;
+  }
+  .EasyMDEContainer .CodeMirror-scroll { min-height: 200px; }
+  .upload-zone {
+    border: 1px dashed var(--border2);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .upload-zone:hover { border-color: var(--accent); color: var(--text); }
+  .form-actions { display: flex; gap: 10px; margin-top: 28px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px">
+
+  <div class="page-header">
+    <div>
+      {% if finding %}
+        <a href="{{ url_for('findings.detail', fid=finding.id) }}" class="text-muted" style="font-size:13px;text-decoration:none">← Back to Finding</a>
+        <div class="page-title" style="margin-top:6px">Edit Finding #{{ finding.id }}</div>
+      {% else %}
+        <a href="{{ url_for('findings.list_findings') }}" class="text-muted" style="font-size:13px;text-decoration:none">← Findings</a>
+        <div class="page-title" style="margin-top:6px">New Finding</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <form method="POST" enctype="multipart/form-data">
+
+      <!-- Basic info -->
+      <div class="section-divider">Basic Info</div>
+      <div class="form-group">
+        <label for="title">Title *</label>
+        <input type="text" id="title" name="title" required
+               value="{{ finding.title if finding else '' }}"
+               placeholder="e.g. Reflected XSS in search parameter">
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label for="target">Target *</label>
+          <input type="text" id="target" name="target" required
+                 value="{{ finding.target if finding else '' }}"
+                 placeholder="e.g. example.com">
+        </div>
+        <div class="form-group">
+          <label for="platform">Platform</label>
+          <input type="text" id="platform" name="platform"
+                 value="{{ finding.platform if finding else '' }}"
+                 placeholder="e.g. HackerOne, Bugcrowd, private">
+        </div>
+      </div>
+
+      <!-- Classification -->
+      <div class="section-divider">Classification</div>
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label for="severity">Severity *</label>
+          <select id="severity" name="severity" required>
+            {% for s in severities %}
+            <option value="{{ s }}" {{ 'selected' if (finding and finding.severity == s) or (not finding and s == 'medium') }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="status">Status</label>
+          <select id="status" name="status">
+            {% for s in statuses %}
+            <option value="{{ s }}" {{ 'selected' if (finding and finding.status == s) or (not finding and s == 'discovered') }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="agent">Agent</label>
+          <select id="agent" name="agent">
+            {% for a in agents %}
+            <option value="{{ a }}" {{ 'selected' if finding and finding.agent == a }}>{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label for="cwe">CWE</label>
+          <input type="text" id="cwe" name="cwe"
+                 value="{{ finding.cwe if finding else '' }}"
+                 placeholder="e.g. CWE-79">
+        </div>
+        <div class="form-group">
+          <label for="cvss">CVSS Score</label>
+          <input type="number" id="cvss" name="cvss" min="0" max="10" step="0.1"
+                 value="{{ finding.cvss if finding else '' }}"
+                 placeholder="e.g. 8.5">
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="section-divider">Description</div>
+      <div class="form-group">
+        <label>Description (Markdown)</label>
+        <textarea id="description" name="description">{{ finding.description if finding else '' }}</textarea>
+      </div>
+
+      <!-- PoC -->
+      <div class="section-divider">Proof of Concept</div>
+      <div class="form-group">
+        <label>PoC / Steps to Reproduce (Markdown)</label>
+        <textarea id="poc" name="poc">{{ finding.poc if finding else '' }}</textarea>
+      </div>
+
+      <!-- Attachments -->
+      <div class="section-divider">Attachments</div>
+      <div class="form-group">
+        <label>Upload Files (screenshots, logs, etc.)</label>
+        <div class="upload-zone" onclick="document.getElementById('attachments').click()">
+          <div>📎 Click to select files</div>
+          <div style="font-size:11px;margin-top:4px">PNG, JPG, PDF, TXT, MD, XML, JSON, HTML, ZIP — max 16 MB each</div>
+          <input type="file" id="attachments" name="attachments" multiple
+                 style="display:none" accept=".png,.jpg,.jpeg,.gif,.pdf,.txt,.md,.xml,.json,.html,.zip">
+        </div>
+        <div id="file-list" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+      </div>
+
+      {% if finding and finding.attachments %}
+      <div style="margin-top:-8px;margin-bottom:16px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Existing attachments (manage from detail page):</div>
+        {% for att in finding.attachments %}
+        <span style="font-size:12px;background:var(--bg3);padding:2px 8px;border-radius:4px;margin-right:6px;margin-bottom:4px;display:inline-block">{{ att.original_name }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Actions -->
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          {{ '💾 Save Changes' if finding else '+ Add Finding' }}
+        </button>
+        {% if finding %}
+          <a href="{{ url_for('findings.detail', fid=finding.id) }}" class="btn btn-ghost">Cancel</a>
+        {% else %}
+          <a href="{{ url_for('findings.list_findings') }}" class="btn btn-ghost">Cancel</a>
+        {% endif %}
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/easymde/2.18.0/easymde.min.js"></script>
+<script>
+  ['description','poc'].forEach(id => {
+    new EasyMDE({
+      element: document.getElementById(id),
+      spellChecker: false,
+      autosave: { enabled: false },
+      toolbar: ['bold','italic','heading','|','code','quote','unordered-list','ordered-list','|','link','image','|','preview','side-by-side','fullscreen'],
+      minHeight: '200px',
+    });
+  });
+
+  // Show selected file names
+  document.getElementById('attachments').addEventListener('change', function() {
+    const names = Array.from(this.files).map(f => f.name).join(', ');
+    document.getElementById('file-list').textContent = names || '';
+  });
+</script>
+{% endblock %}

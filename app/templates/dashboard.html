@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; margin-bottom: 6px; }
+  .stat-value { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; }
+  .stat-critical { color: var(--critical); }
+  .stat-high     { color: var(--high); }
+  .stat-rewarded { color: #06d6a0; }
+  .stat-total    { color: var(--accent2); }
+  .stat-confirmed{ color: #06d6a0; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media(max-width:700px){ .two-col { grid-template-columns: 1fr; } }
+
+  .mini-chart { display: flex; flex-direction: column; gap: 7px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .bar-label { width: 90px; color: var(--muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
+  .bar-track { flex: 1; background: var(--bg3); border-radius: 3px; height: 6px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 3px; transition: width .4s; }
+  .bar-count { color: var(--muted); font-family: var(--mono); font-size: 11px; min-width: 24px; text-align: right; }
+
+  .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px; }
+
+  .finding-row td:first-child a {
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .finding-row td:first-child a:hover { color: var(--accent2); }
+  .target-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg3);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">Dashboard</div>
+      <div class="text-muted" style="font-size:13px;margin-top:2px">Overview of all findings</div>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Findings</div>
+      <div class="stat-value stat-total">{{ total }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Critical</div>
+      <div class="stat-value stat-critical">{{ sev_counts.critical }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">High</div>
+      <div class="stat-value stat-high">{{ sev_counts.high }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Confirmed</div>
+      <div class="stat-value stat-confirmed">{{ confirmed }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Rewarded 💰</div>
+      <div class="stat-value stat-rewarded">{{ rewarded }}</div>
+    </div>
+  </div>
+
+  <!-- Mini charts row -->
+  <div class="two-col">
+
+    <!-- Severity breakdown -->
+    <div class="card">
+      <div class="section-title">By Severity</div>
+      {% set sev_colors = {'critical':'#ff4d6d','high':'#ff9a3c','medium':'#ffd166','low':'#6bbcff','informational':'#555'} %}
+      {% set sev_max = [sev_counts.values()|list|max, 1]|max %}
+      <div class="mini-chart">
+        {% for s in ['critical','high','medium','low','informational'] %}
+        <div class="bar-row">
+          <span class="bar-label">{{ s }}</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:{{ ((sev_counts[s] / sev_max) * 100)|round }}%;background:{{ sev_colors[s] }}"></div>
+          </div>
+          <span class="bar-count">{{ sev_counts[s] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Status breakdown -->
+    <div class="card">
+      <div class="section-title">By Status</div>
+      {% set sta_colors = {'discovered':'#666','debugging':'#ff9a3c','confirmed':'#06d6a0','reported':'#a78bfa','rewarded':'#00ffb3','denied':'#ff4d6d','duplicate':'#444','n/a':'#333'} %}
+      {% set sta_max = [sta_counts.values()|list|max, 1]|max %}
+      <div class="mini-chart">
+        {% for s in ['discovered','debugging','confirmed','reported','rewarded','denied','duplicate','n/a'] %}
+        <div class="bar-row">
+          <span class="bar-label">{{ s }}</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:{{ ((sta_counts[s] / sta_max) * 100)|round }}%;background:{{ sta_colors[s] }}"></div>
+          </div>
+          <span class="bar-count">{{ sta_counts[s] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Agent breakdown -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="section-title">By Agent</div>
+    {% set agt_colors = {'gemini-cli':'#4285f4','claude-code':'#a78bfa','codex':'#00c853','manual':'#888','other':'#555'} %}
+    {% set agt_max = [agent_counts.values()|list|max, 1]|max %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+      {% for a in ['gemini-cli','claude-code','codex','manual','other'] %}
+      <div class="bar-row">
+        <span class="bar-label">{{ a }}</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:{{ ((agent_counts[a] / agt_max) * 100)|round }}%;background:{{ agt_colors[a] }}"></div>
+        </div>
+        <span class="bar-count">{{ agent_counts[a] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Recent findings -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="section-title" style="margin-bottom:0">Recent Findings</div>
+      <a href="{{ url_for('findings.list_findings') }}" class="btn btn-ghost btn-sm">View all →</a>
+    </div>
+    {% if recent %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Target</th>
+            <th>Severity</th>
+            <th>Status</th>
+            <th>Agent</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in recent %}
+          <tr class="finding-row">
+            <td class="mono text-muted" style="font-size:11px">{{ f.id }}</td>
+            <td><a href="{{ url_for('findings.detail', fid=f.id) }}">{{ f.title }}</a></td>
+            <td><span class="target-tag">{{ f.target }}</span></td>
+            <td><span class="badge badge-{{ f.severity }}">{{ f.severity }}</span></td>
+            <td>
+              {% set sc = f.status.replace('/','').replace('-','') %}
+              <span class="badge badge-{{ sc }}">{{ f.status }}</span>
+            </td>
+            <td class="text-muted mono" style="font-size:11px">{{ f.agent }}</td>
+            <td class="text-muted" style="font-size:12px">
+              {{ f.created_at.strftime('%Y-%m-%d') if f.created_at else '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div style="text-align:center;padding:40px;color:var(--muted)">
+        No findings yet. <a href="{{ url_for('findings.add_finding') }}" style="color:var(--accent2)">Add the first one →</a>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

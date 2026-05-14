@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>bb-huge — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f; --bg2: #111118; --bg3: #1a1a24;
+      --border: #2a2a3a; --text: #e2e2f0; --muted: #7070a0;
+      --accent: #7c6aff; --accent2: #a78bfa;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Space Grotesk', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-wrap {
+      width: 100%;
+      max-width: 380px;
+      padding: 24px;
+    }
+    .logo {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent2);
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .logo span { color: var(--muted); }
+    .tagline {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 32px;
+    }
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+    input[type=password] {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-family: var(--mono);
+      font-size: 14px;
+      width: 100%;
+      outline: none;
+      transition: border-color .15s;
+      letter-spacing: 2px;
+    }
+    input[type=password]:focus { border-color: var(--accent); }
+    .btn {
+      width: 100%;
+      margin-top: 18px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .error {
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: rgba(255,77,109,.1);
+      border: 1px solid rgba(255,77,109,.25);
+      color: #ff4d6d;
+      border-radius: 7px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="logo">bb<span>-</span>huge 🤗</div>
+    <div class="tagline">bug bounty findings portal</div>
+    <div class="card">
+      <form method="POST">
+        <label for="dev_key">Dev Key</label>
+        <input type="password" id="dev_key" name="dev_key"
+               placeholder="••••••••••••••••" autofocus autocomplete="current-password">
+        <button type="submit" class="btn">Enter →</button>
+        {% if error %}
+          <div class="error">{{ error }}</div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</body>
+</html>

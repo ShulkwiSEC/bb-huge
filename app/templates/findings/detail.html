@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}{{ finding.title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<style>
+  .detail-header {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    align-items: flex-start; margin-bottom: 24px;
+  }
+  .detail-header-main { flex: 1; min-width: 0; }
+  .detail-title { font-size: 22px; font-weight: 600; line-height: 1.3; margin-bottom: 10px; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+  .meta-pill {
+    display: flex; align-items: center; gap: 5px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .meta-pill strong { color: var(--text); }
+  .meta-pill.mono strong { font-family: var(--mono); }
+
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab-btn {
+    padding: 10px 18px; font-size: 13px; font-weight: 500;
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; transition: all .15s; font-family: var(--sans);
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .status-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .status-form select { width: auto; padding: 7px 10px; font-size: 13px; }
+
+  .attachment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px; margin-top: 12px;
+  }
+  .attachment-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .attachment-icon { font-size: 20px; flex-shrink: 0; }
+  .attachment-name {
+    font-size: 12px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1;
+  }
+  .attachment-name a { color: var(--accent2); text-decoration: none; }
+
+  .danger-zone {
+    border: 1px solid rgba(255,77,109,.2);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-top: 24px;
+  }
+  .danger-zone h3 { font-size: 13px; color: var(--critical); margin-bottom: 10px; }
+
+  .cvss-big {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .info-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .info-box .ib-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; font-weight: 600; margin-bottom: 6px; }
+  .info-box .ib-value { font-size: 13px; font-weight: 500; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- Header -->
+  <div class="detail-header">
+    <div class="detail-header-main">
+      <a href="{{ url_for('findings.list_findings') }}" class="text-muted" style="font-size:13px;text-decoration:none">← Findings</a>
+      <div class="detail-title" style="margin-top:8px">{{ finding.title }}</div>
+      <div class="meta-row">
+        <span class="badge badge-{{ finding.severity }}">{{ finding.severity }}</span>
+        {% set sc = finding.status.replace('/','').replace('-','') %}
+        <span class="badge badge-{{ sc }}">{{ finding.status }}</span>
+        <span class="meta-pill mono"><strong>{{ finding.agent }}</strong></span>
+        <span class="meta-pill"><strong>{{ finding.target }}</strong></span>
+        <span class="meta-pill">{{ finding.platform }}</span>
+        {% if finding.cwe %}
+        <span class="meta-pill mono"><strong>{{ finding.cwe }}</strong></span>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <a href="{{ url_for('findings.edit_finding', fid=finding.id) }}" class="btn btn-ghost">Edit</a>
+    </div>
+  </div>
+
+  <!-- Info row -->
+  <div class="info-grid">
+    {% if finding.cvss %}
+    <div class="info-box">
+      <div class="ib-label">CVSS Score</div>
+      <div class="ib-value">
+        {% if finding.cvss >= 9 %}
+          <span class="cvss-big" style="color:var(--critical)">{{ "%.1f"|format(finding.cvss) }}</span>
+        {% elif finding.cvss >= 7 %}
+          <span class="cvss-big" style="color:var(--high)">{{ "%.1f"|format(finding.cvss) }}</span>
+        {% elif finding.cvss >= 4 %}
+          <span class="cvss-big" style="color:var(--medium)">{{ "%.1f"|format(finding.cvss) }}</span>
+        {% else %}
+          <span class="cvss-big" style="color:var(--low)">{{ "%.1f"|format(finding.cvss) }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="info-box">
+      <div class="ib-label">Created</div>
+      <div class="ib-value mono" style="font-size:12px">
+        {{ finding.created_at.strftime('%Y-%m-%d %H:%M') if finding.created_at else '—' }}
+      </div>
+    </div>
+    <div class="info-box">
+      <div class="ib-label">Last Updated</div>
+      <div class="ib-value mono" style="font-size:12px">
+        {{ finding.updated_at.strftime('%Y-%m-%d %H:%M') if finding.updated_at else '—' }}
+      </div>
+    </div>
+    <div class="info-box">
+      <div class="ib-label">Attachments</div>
+      <div class="ib-value">{{ finding.attachments|length }}</div>
+    </div>
+  </div>
+
+  <!-- Quick status update -->
+  <div class="card" style="margin-bottom:20px">
+    <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Update Status</div>
+    <form method="POST" action="{{ url_for('findings.update_status', fid=finding.id) }}" class="status-form">
+      <select name="status">
+        {% for s in statuses %}
+        <option value="{{ s }}" {{ 'selected' if finding.status == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">Update →</button>
+    </form>
+  </div>
+
+  <!-- Tabs -->
+  <div class="card">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('description', this)">Description</button>
+      <button class="tab-btn" onclick="showTab('poc', this)">PoC / Steps</button>
+      <button class="tab-btn" onclick="showTab('attachments', this)">
+        Attachments
+        {% if finding.attachments %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ finding.attachments|length }}</span>{% endif %}
+      </button>
+    </div>
+
+    <!-- Description -->
+    <div id="tab-description" class="tab-panel active">
+      {% if finding.description %}
+        <div class="md-body" id="md-description">{{ finding.description }}</div>
+      {% else %}
+        <div class="text-muted">No description.</div>
+      {% endif %}
+    </div>
+
+    <!-- PoC -->
+    <div id="tab-poc" class="tab-panel">
+      {% if finding.poc %}
+        <div class="md-body" id="md-poc">{{ finding.poc }}</div>
+      {% else %}
+        <div class="text-muted">No PoC written yet.</div>
+      {% endif %}
+    </div>
+
+    <!-- Attachments -->
+    <div id="tab-attachments" class="tab-panel">
+      {% if finding.attachments %}
+        <div class="attachment-grid">
+          {% for att in finding.attachments %}
+          <div class="attachment-card">
+            <span class="attachment-icon">
+              {% set ext = att.original_name.rsplit('.',1)[-1].lower() %}
+              {% if ext in ['png','jpg','jpeg','gif','webp'] %}🖼️
+              {% elif ext == 'pdf' %}📄
+              {% elif ext in ['txt','md'] %}📝
+              {% else %}📎{% endif %}
+            </span>
+            <div style="flex:1;min-width:0">
+              <div class="attachment-name">
+                <a href="{{ url_for('findings.uploaded_file', filename=att.filename) }}" target="_blank">
+                  {{ att.original_name }}
+                </a>
+              </div>
+              <div style="font-size:11px;color:var(--muted)">
+                {{ att.uploaded_at.strftime('%Y-%m-%d') if att.uploaded_at else '' }}
+              </div>
+            </div>
+            <form method="POST" action="{{ url_for('findings.delete_attachment', aid=att.id) }}"
+                  onsubmit="return confirm('Delete attachment?')">
+              <button type="submit" class="btn btn-danger btn-sm" title="Delete">✕</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-muted" style="padding:20px 0">No attachments.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Danger zone -->
+  <div class="danger-zone">
+    <h3>⚠ Danger Zone</h3>
+    <form method="POST" action="{{ url_for('findings.delete_finding', fid=finding.id) }}"
+          onsubmit="return confirm('Delete this finding permanently?')">
+      <button type="submit" class="btn btn-danger btn-sm">Delete Finding</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  // Render markdown
+  marked.setOptions({ breaks: true, gfm: true });
+  ['md-description', 'md-poc'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = marked.parse(el.textContent);
+  });
+  // Syntax highlight
+  document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+
+  // Tabs
+  function showTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+{% endblock %}

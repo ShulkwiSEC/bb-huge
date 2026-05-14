@@ -1,0 +1,64 @@
+# bb-huge MCP Server Configuration
+# ===================================
+# Copy the relevant section to your agent's config file.
+# Make sure DEV_KEY matches your .env file.
+
+
+# ── Gemini CLI ────────────────────────────────────────────────────────────────
+# File: ~/.gemini/settings.json  (or project-local .gemini/settings.json)
+#
+# {
+#   "mcpServers": {
+#     "bb-huge": {
+#       "command": "python",
+#       "args": ["/path/to/bb-huge/mcp_server.py"],
+#       "env": {
+#         "DEV_KEY": "shulkwisec_123",
+#         "BB_HUGE_URL": "http://127.0.0.1:5000"
+#       }
+#     }
+#   }
+# }
+
+
+# ── Claude Code (claude_desktop_config.json) ──────────────────────────────────
+# macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json
+# Windows: %APPDATA%\Claude\claude_desktop_config.json
+# Linux:   ~/.config/Claude/claude_desktop_config.json
+#
+# {
+#   "mcpServers": {
+#     "bb-huge": {
+#       "command": "python",
+#       "args": ["/path/to/bb-huge/mcp_server.py"],
+#       "env": {
+#         "DEV_KEY": "bb-huge-dev-key-change-me",
+#         "BB_HUGE_URL": "http://127.0.0.1:5000"
+#       }
+#     }
+#   }
+# }
+
+
+# ── OpenAI Codex / codex CLI ──────────────────────────────────────────────────
+# Add to your codex config or run the MCP server as a subprocess.
+# The mcp_server.py uses stdio transport — compatible with any MCP client.
+#
+# {
+#   "mcp": {
+#     "servers": {
+#       "bb-huge": {
+#         "command": "python /path/to/bb-huge/mcp_server.py",
+#         "env": {
+#           "DEV_KEY": "bb-huge-dev-key-change-me",
+#           "BB_HUGE_URL": "http://127.0.0.1:5000"
+#         }
+#       }
+#     }
+#   }
+# }
+
+
+# ── Quick test (no agent needed) ──────────────────────────────────────────────
+# echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | \
+#   DEV_KEY=bb-huge-dev-key-change-me python mcp_server.py
