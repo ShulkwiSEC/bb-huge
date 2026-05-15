@@ -4,6 +4,17 @@
 
 ---
 
+<!-- Demo Video -->
+<video src="https://github.com/user-attachments/assets/02aaa777-1fd0-41f2-9dd1-5dee021fcb6a"
+       autoplay
+       loop
+       muted
+       playsinline
+       controls
+       width="100%">
+</video>
+
+
 ## Features
 
 - **Dashboard** — stats by severity, status, and agent; recent findings table
