@@ -90,7 +90,7 @@ def _post_json(url: str, body: dict) -> tuple[bool, str]:
     data = json.dumps(body).encode()
     req  = urllib.request.Request(
         url, data=data,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (compatible; bb-huge/2.0)"},
         method="POST"
     )
     try:
