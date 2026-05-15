@@ -5,7 +5,7 @@
 Not a portal. A **Context Engineering Architecture** that converts your AI agent into a disciplined bug bounty hunter with a single slash command. The web UI is just the visible tip — the real power is what happens inside the agent's brain when the skill fires.
 
 <!-- Demo Video -->
-<video src="/assets/vedios/bb-huge.mp4"
+<video src="https://github.com/user-attachments/assets/28cae5fe-51e4-4e48-8160-d1e7d2c47207"
        autoplay loop muted playsinline controls width="100%">
 </video>
 
