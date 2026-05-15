@@ -68,6 +68,10 @@ def api_patch(path, b):
     return _req("PATCH", path, b)
 
 
+def api_put(path, b):
+    return _req("PUT", path, b)
+
+
 def api_delete(path):
     return _req("DELETE", path)
 
@@ -438,6 +442,38 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "bb_get_context",
+        "description": "Retrieve pre-hunt context / Q&A data for a program. Call this at the start of a session to see if the user has already answered the pre-hunt questionnaire.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {
+                    "type": "integer",
+                    "description": "Program ID",
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_save_context",
+        "description": "Save pre-hunt context / Q&A answers for a program. Use this after the questioning phase to persist the user's responses so they are never asked again.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "data"],
+            "properties": {
+                "program_id": {
+                    "type": "integer",
+                    "description": "Program ID",
+                },
+                "data": {
+                    "type": "object",
+                    "description": "Key-value pairs of context data collected from the user",
+                },
+            },
+        },
+    },
 ]
 
 
@@ -540,6 +576,13 @@ def dispatch(name: str, args: dict) -> Any:
     elif name == "bb_add_recon":
         pid = args.pop("program_id")
         return api_post(f"/programs/{pid}/recon", args)
+
+    elif name == "bb_get_context":
+        return api_get(f"/programs/{args['program_id']}/context")
+
+    elif name == "bb_save_context":
+        pid = args.pop("program_id")
+        return api_put(f"/programs/{pid}/context", {"data": args})
 
     else:
         return {"error": f"Unknown tool: {name}"}

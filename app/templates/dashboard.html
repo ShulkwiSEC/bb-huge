@@ -3,46 +3,185 @@
 
 {% block extra_head %}
 <style>
+  /* ── STAT CARDS ── */
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
-    margin-bottom: 28px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
   }
   .stat-card {
+    position: relative;
+    overflow: hidden;
     background: var(--bg2);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 18px 20px;
+    padding: 16px 18px;
     transition: border-color 0.2s, transform 0.15s;
     animation: fadeIn 0.4s ease-out;
   }
-  .stat-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: 10px 10px 0 0;
+  }
+  .stat-card:hover { border-color: var(--border2); transform: translateY(-2px); }
   .stat-card:nth-child(1) { animation-delay: 0s; }
-  .stat-card:nth-child(2) { animation-delay: 0.05s; }
-  .stat-card:nth-child(3) { animation-delay: 0.1s; }
-  .stat-card:nth-child(4) { animation-delay: 0.15s; }
-  .stat-card:nth-child(5) { animation-delay: 0.2s; }
-  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; margin-bottom: 6px; }
-  .stat-value { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; }
-  .stat-critical { color: var(--critical); }
-  .stat-high     { color: var(--high); }
-  .stat-rewarded { color: #06d6a0; }
-  .stat-total    { color: var(--accent2); }
-  .stat-confirmed{ color: #06d6a0; }
+  .stat-card:nth-child(2) { animation-delay: 0.04s; }
+  .stat-card:nth-child(3) { animation-delay: 0.08s; }
+  .stat-card:nth-child(4) { animation-delay: 0.12s; }
+  .stat-card:nth-child(5) { animation-delay: 0.16s; }
+  .stat-card.stat-total::before  { background: linear-gradient(90deg, #8a7aff, #b39dfa); }
+  .stat-card.stat-critical::before { background: linear-gradient(90deg, #ff4d6d, #ff708d); }
+  .stat-card.stat-high::before   { background: linear-gradient(90deg, #ff9a3c, #ffb347); }
+  .stat-card.stat-confirmed::before { background: linear-gradient(90deg, #06d6a0, #06d6c0); }
+  .stat-card.stat-rewarded::before { background: linear-gradient(90deg, #00ffb3, #00ffd5); }
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .stat-value.stat-total    { color: var(--accent2); }
+  .stat-value.stat-critical { color: var(--critical); }
+  .stat-value.stat-high     { color: var(--high); }
+  .stat-value.stat-confirmed { color: #06d6a0; }
+  .stat-value.stat-rewarded { color: #00ffb3; }
 
+  /* ── QUICK ACTIONS ── */
+  .quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .quick-action {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
+    overflow: hidden;
+  }
+  .quick-action::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 3px 0 0 3px;
+    transition: width 0.2s;
+  }
+  .quick-action:hover { border-color: var(--border2); transform: translateY(-2px); }
+  .quick-action:hover::before { width: 4px; }
+  .quick-action:active { transform: translateY(0); }
+  .qa-purple::before { background: var(--accent); }
+  .qa-blue::before   { background: var(--low); }
+  .qa-red::before    { background: var(--critical); }
+  .qa-green::before  { background: #06d6a0; }
+  .qa-purple:hover { background: rgba(138,122,255,0.06); border-color: rgba(138,122,255,0.3); }
+  .qa-blue:hover   { background: rgba(107,188,255,0.06); border-color: rgba(107,188,255,0.3); }
+  .qa-red:hover    { background: rgba(255,77,109,0.06); border-color: rgba(255,77,109,0.3); }
+  .qa-green:hover  { background: rgba(6,214,160,0.06); border-color: rgba(6,214,160,0.3); }
+  .qa-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .qa-purple .qa-icon { background: rgba(138,122,255,0.12); }
+  .qa-blue .qa-icon   { background: rgba(107,188,255,0.12); }
+  .qa-red .qa-icon    { background: rgba(255,77,109,0.12); }
+  .qa-green .qa-icon  { background: rgba(6,214,160,0.12); }
+  .qa-body { flex: 1; min-width: 0; }
+  .qa-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+  .qa-desc {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+  .qa-kbd {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--bg3);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── CHARTS ── */
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
   @media(max-width:700px){ .two-col { grid-template-columns: 1fr; } }
-
-  .mini-chart { display: flex; flex-direction: column; gap: 7px; }
+  .mini-chart { display: flex; flex-direction: column; gap: 6px; }
   .bar-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .bar-label { width: 90px; color: var(--muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
   .bar-track { flex: 1; background: var(--bg3); border-radius: 3px; height: 6px; overflow: hidden; }
   .bar-fill  { height: 100%; border-radius: 3px; transition: width .6s ease-out; }
   .bar-count { color: var(--muted); font-family: var(--mono); font-size: 11px; min-width: 24px; text-align: right; }
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    margin-bottom: 12px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-header .section-title { margin-bottom: 0; }
 
-  .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px; }
+  /* ── PROGRAMS MINI ── */
+  .program-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+  }
+  .program-mini {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-decoration: none;
+    color: var(--text);
+    transition: 0.2s;
+  }
+  .program-mini:hover { border-color: var(--accent); }
+  .program-mini-name { font-size: 13px; font-weight: 600; }
+  .program-mini-stats { display: flex; gap: 8px; margin-top: 5px; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .program-mini-stats .crit { color: var(--critical); }
+  .program-mini-stats .hi   { color: var(--high); }
+  .program-mini-stats .rwd  { color: #00ffb3; }
 
+  /* ── TABLE ── */
   .finding-row td:first-child a {
     color: var(--text);
     text-decoration: none;
@@ -58,110 +197,96 @@
     border-radius: 4px;
   }
 
-  .quick-actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--muted);
   }
-  .quick-action {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 18px;
-    text-decoration: none;
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 500;
-    transition: 0.2s;
-  }
-  .quick-action:hover {
-    border-color: var(--accent);
-    background: rgba(138,122,255,0.05);
-  }
-  .quick-action-icon { font-size: 18px; }
+  .empty-state-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.5; }
+  .empty-state-text { font-size: 14px; margin-bottom: 16px; }
+  .empty-state .btn { display: inline-flex; }
 
-  .program-mini-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 10px;
-    margin-bottom: 24px;
+  @media (max-width: 480px) {
+    .quick-actions { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
   }
-  .program-mini {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-    text-decoration: none;
-    color: var(--text);
-    transition: 0.2s;
-  }
-  .program-mini:hover { border-color: var(--accent); }
-  .program-mini-name { font-size: 13px; font-weight: 600; }
-  .program-mini-stats { display: flex; gap: 8px; margin-top: 6px; font-size: 11px; color: var(--muted); font-family: var(--mono); }
-  .program-mini-stats .crit { color: var(--critical); }
-  .program-mini-stats .hi { color: var(--high); }
-  .program-mini-stats .rwd { color: #00ffb3; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
 
+  <!-- Header -->
   <div class="page-header">
     <div>
       <div class="page-title">Dashboard</div>
-      <div class="text-muted" style="font-size:13px;margin-top:2px">bug bounty — huge 🤗</div>
+      <div class="text-muted" style="font-size:13px;margin-top:1px">bug bounty — huge 🤗</div>
     </div>
   </div>
 
-  <!-- Stat cards -->
+  <!-- Stats -->
   <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-label">Total Findings</div>
+    <div class="stat-card stat-total">
+      <div class="stat-label">Total</div>
       <div class="stat-value stat-total">{{ total }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card stat-critical">
       <div class="stat-label">Critical</div>
       <div class="stat-value stat-critical">{{ sev_counts.critical }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card stat-high">
       <div class="stat-label">High</div>
       <div class="stat-value stat-high">{{ sev_counts.high }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card stat-confirmed">
       <div class="stat-label">Confirmed</div>
       <div class="stat-value stat-confirmed">{{ confirmed }}</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Rewarded 💰</div>
+    <div class="stat-card stat-rewarded">
+      <div class="stat-label">Rewarded</div>
       <div class="stat-value stat-rewarded">{{ rewarded }}</div>
     </div>
   </div>
 
   <!-- Quick actions -->
   <div class="quick-actions">
-    <a href="{{ url_for('findings.add_finding') }}" class="quick-action">
-      <span class="quick-action-icon">📝</span> New Finding
+    <a href="{{ url_for('findings.add_finding') }}" class="quick-action qa-purple">
+      <div class="qa-icon">📝</div>
+      <div class="qa-body">
+        <div class="qa-title">New Finding</div>
+        <div class="qa-desc">Log a vulnerability or recon note</div>
+      </div>
+      <span class="qa-kbd">N</span>
     </a>
-    <a href="{{ url_for('programs.add_program') }}" class="quick-action">
-      <span class="quick-action-icon">📋</span> New Program
+    <a href="{{ url_for('programs.add_program') }}" class="quick-action qa-blue">
+      <div class="qa-icon">📋</div>
+      <div class="qa-body">
+        <div class="qa-title">New Program</div>
+        <div class="qa-desc">Create a target program with scope</div>
+      </div>
+      <span class="qa-kbd"></span>
     </a>
-    <a href="{{ url_for('findings.list_findings', severity='critical') }}" class="quick-action">
-      <span class="quick-action-icon">🔴</span> Critical Findings
+    <a href="{{ url_for('findings.list_findings', severity='critical') }}" class="quick-action qa-red">
+      <div class="qa-icon">🔴</div>
+      <div class="qa-body">
+        <div class="qa-title">Critical</div>
+        <div class="qa-desc">{{ sev_counts.critical }} high-severity findings</div>
+      </div>
+      <span class="qa-kbd"></span>
     </a>
-    <a href="{{ url_for('findings.list_findings', status='confirmed') }}" class="quick-action">
-      <span class="quick-action-icon">✅</span> Confirmed (unreported)
+    <a href="{{ url_for('findings.list_findings', status='confirmed') }}" class="quick-action qa-green">
+      <div class="qa-icon">✅</div>
+      <div class="qa-body">
+        <div class="qa-title">Confirmed</div>
+        <div class="qa-desc">{{ confirmed }} findings ready to report</div>
+      </div>
+      <span class="qa-kbd"></span>
     </a>
   </div>
 
-  <!-- Mini charts row -->
+  <!-- Charts -->
   <div class="two-col">
-
-    <!-- Severity breakdown -->
     <div class="card">
       <div class="section-title">By Severity</div>
       {% set sev_colors = {'critical':'#ff4d6d','high':'#ff9a3c','medium':'#ffd166','low':'#6bbcff','informational':'#555'} %}
@@ -178,8 +303,6 @@
         {% endfor %}
       </div>
     </div>
-
-    <!-- Status breakdown -->
     <div class="card">
       <div class="section-title">By Status</div>
       {% set sta_colors = {'discovered':'#666','debugging':'#ff9a3c','confirmed':'#06d6a0','reported':'#a78bfa','rewarded':'#00ffb3','denied':'#ff4d6d','duplicate':'#444','n/a':'#333'} %}
@@ -196,36 +319,40 @@
         {% endfor %}
       </div>
     </div>
-
   </div>
 
   <!-- Agent breakdown -->
+  {% set agt_total = agent_counts.values()|sum %}
+  {% if agt_total > 0 %}
   <div class="card" style="margin-bottom:24px">
     <div class="section-title">By Agent</div>
-    {% set agt_colors = {'gemini-cli':'#4285f4','claude-code':'#a78bfa','codex':'#00c853','manual':'#888','other':'#555'} %}
+    {% set agt_colors = {'gemini-cli':'#4285f4','claude-code':'#a78bfa','codex':'#00c853','claude':'#7c6aff','emmu':'#ff9a3c','manual':'#888','other':'#555'} %}
     {% set agt_max = [agent_counts.values()|list|max, 1]|max %}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-      {% for a in ['gemini-cli','claude-code','codex','manual','other'] %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">
+      {% for a in ['gemini-cli','claude-code','claude','codex','emmu','manual','other'] %}
+      {% if agent_counts[a] > 0 %}
       <div class="bar-row">
         <span class="bar-label">{{ a }}</span>
         <div class="bar-track">
-          <div class="bar-fill" style="width:{{ ((agent_counts[a] / agt_max) * 100)|round }}%;background:{{ agt_colors[a] }}"></div>
+          <div class="bar-fill" style="width:{{ ((agent_counts[a] / agt_max) * 100)|round }}%;background:{{ agt_colors.get(a, '#555') }}"></div>
         </div>
         <span class="bar-count">{{ agent_counts[a] }}</span>
       </div>
+      {% endif %}
       {% endfor %}
     </div>
   </div>
+  {% endif %}
 
-  <!-- Programs -->
+  <!-- Active programs -->
   {% if programs %}
   <div class="card" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:0">Active Programs</div>
-      <a href="{{ url_for('programs.list_programs') }}" class="btn btn-ghost btn-sm">All Programs →</a>
+    <div class="section-header">
+      <div class="section-title">Active Programs</div>
+      <a href="{{ url_for('programs.list_programs') }}" class="btn btn-ghost btn-sm">All →</a>
     </div>
     <div class="program-mini-grid">
-      {% for p in programs %}
+      {% for p in programs if p.active %}
       {% set s = p.stats() %}
       <a href="{{ url_for('programs.detail', pid=p.id) }}" class="program-mini">
         <div class="program-mini-name">{{ p.name }}</div>
@@ -233,7 +360,7 @@
           <span>{{ s.total }} total</span>
           {% if s.by_severity.critical > 0 %}<span class="crit">{{ s.by_severity.critical }} crit</span>{% endif %}
           {% if s.by_severity.high > 0 %}<span class="hi">{{ s.by_severity.high }} high</span>{% endif %}
-          {% if s.by_status.rewarded > 0 %}<span class="rwd">{{ s.by_status.rewarded }} 💰</span>{% endif %}
+          {% if s.by_status.rewarded > 0 %}<span class="rwd">{{ s.by_status.rewarded }}💰</span>{% endif %}
         </div>
       </a>
       {% endfor %}
@@ -243,8 +370,8 @@
 
   <!-- Recent findings -->
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:0">Recent Findings</div>
+    <div class="section-header">
+      <div class="section-title">Recent Findings</div>
       <a href="{{ url_for('findings.list_findings') }}" class="btn btn-ghost btn-sm">View all →</a>
     </div>
     {% if recent %}
@@ -256,7 +383,7 @@
             <th>Title</th>
             <th>Target</th>
             <th>Program</th>
-            <th>Severity</th>
+            <th>Sev</th>
             <th>Status</th>
             <th>Date</th>
           </tr>
@@ -274,13 +401,13 @@
                 <span class="text-muted" style="font-size:11px">—</span>
               {% endif %}
             </td>
-            <td><span class="badge badge-{{ f.severity }}">{{ f.severity }}</span></td>
+            <td><span class="badge badge-{{ f.severity }}">{{ f.severity[:4] }}</span></td>
             <td>
               {% set sc = f.status.replace('/','').replace('-','') %}
-              <span class="badge badge-{{ sc }}">{{ f.status }}</span>
+              <span class="badge badge-{{ sc }}" style="font-size:10px">{{ f.status[:6] }}</span>
             </td>
             <td class="text-muted" style="font-size:12px">
-              {{ f.created_at.strftime('%Y-%m-%d') if f.created_at else '—' }}
+              {{ f.created_at.strftime('%m/%d') if f.created_at else '—' }}
             </td>
           </tr>
           {% endfor %}
@@ -288,9 +415,11 @@
       </table>
     </div>
     {% else %}
-      <div style="text-align:center;padding:40px;color:var(--muted)">
-        No findings yet. <a href="{{ url_for('findings.add_finding') }}" style="color:var(--accent2)">Add the first one →</a>
-      </div>
+    <div class="empty-state">
+      <div class="empty-state-icon">🔍</div>
+      <div class="empty-state-text">No findings yet. Start logging vulnerabilities.</div>
+      <a href="{{ url_for('findings.add_finding') }}" class="btn btn-primary">+ Add Your First Finding</a>
+    </div>
     {% endif %}
   </div>
 

@@ -33,8 +33,9 @@ When starting any new session or receiving a new target:
 3. Load bb-standards.md                — confirm what's in scope
 4. bb_list_findings (q=<target>)       — check if prior work exists
 5. bb_list_programs                    — check if target program exists in portal
-6. If prior work exists → bb_get_finding + bb-dump-attachments.py
-7. Report a one-paragraph status summary before starting any testing
+6. bb_get_context(program_id)          — load pre-hunt Q&A; if empty, run SOP-5
+7. If prior work exists → bb_get_finding + bb-dump-attachments.py
+8. Report a one-paragraph status summary before starting any testing
 ```
 
 ---

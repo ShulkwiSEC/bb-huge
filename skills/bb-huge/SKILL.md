@@ -46,6 +46,8 @@ All portal operations use the `bb-huge` MCP server. Auth is handled via the
 | `bb_create_program` | Create a new bug bounty program entry with scope |
 | `bb_add_recon` | Log recon data (subdomains, endpoints, tech) under a program |
 | `bb_get_stats` | Dashboard summary — totals by severity/status/agent |
+| `bb_get_context` | Retrieve pre-hunt Q&A data for a program |
+| `bb_save_context` | Save pre-hunt Q&A answers for a program |
 | `bb_notify` | Send an alert to Discord/Telegram webhooks |
 
 **Agent identity rule**: Always set `agent` to the identity of whoever is
@@ -201,6 +203,94 @@ Before closing any research session:
 2. For any finding still in `debugging`, add a progress note via
    `bb_update_finding` so the next session picks up cleanly.
 3. Flag any `confirmed` findings that haven't been `reported` yet.
+
+### SOP-5 · Pre-Hunt Questioning Layer ⭐
+
+**THIS IS THE MOST IMPORTANT STEP.** Before starting any work on a new target,
+you MUST collect context from the user. This data is stored once and never
+re-asked.
+
+**When to run:**
+- A new target/program is assigned
+- `bb_get_context` returns empty data for the program
+
+**When NOT to run:**
+- You already called `bb_get_context` and it returned non-empty data
+- You are resuming work on an existing target (SOP-3 applies instead)
+
+**Workflow:**
+
+```
+1. bb_list_programs()                          — check if program exists
+2. If not found: bb_create_program({name})     — create it first
+3. bb_get_context({program_id})                — check if context already saved
+4. If data is non-empty → skip to testing
+5. If data is empty → RUN QUESTIONING (below)
+6. bb_save_context({program_id, data})         — persist answers permanently
+```
+
+**Mandatory questions to ask the user — every category:**
+
+```
+📌 TARGET BASICS
+  - What is the target domain(s) / application name?
+  - What does this application / company do? (business context)
+  - What is the brand name and what should we know about their security posture?
+  - Is this a public bug bounty program, private program, or pentest?
+
+🔐 ACCESS & CREDENTIALS
+  - Do you have tester accounts / credentials? (email:password pairs)
+  - Do you have raw cookies or session tokens for authenticated testing?
+  - Do you have API keys, access tokens, or OAuth client credentials?
+  - Are there any special headers (e.g. Authorization: Bearer ...) needed?
+  - What is the auth mechanism? (JWT, session cookie, OAuth, SSO, basic auth)
+
+🌐 ATTACK SURFACE
+  - Is there a source code repository available? (GitHub, GitLab, etc.)
+  - Are there any known subdomains or endpoints already discovered?
+  - What technology stack is the app built on? (if known)
+  - Are there API docs / Swagger / GraphQL playgrounds available?
+  - Is mobile app testing in scope? (APK/IPA available?)
+  - Any WAF, rate limiting, or protections we should expect?
+
+🎯 PRIORITIES & FOCUS
+  - What type of bugs should we focus on? (e.g. IDOR, SSRF, XSS, logic flaws)
+  - Is there any specific feature / endpoint that looks suspicious?
+  - Have there been any previous bugs found on this target? (disclosed reports)
+  - Any specific pain points or areas the dev team is worried about?
+
+🧪 ENVIRONMENT
+  - Is there a staging / dev environment separate from production?
+  - Do you have VPN access or need one?
+  - Any tools already running? (Burp, proxies, scanners)
+```
+
+**After collecting answers**, organize them into a clean dict and save:
+
+```json
+bb_save_context({
+  "program_id": 2,
+  "data": {
+    "target_domains": ["app.example.com", "api.example.com"],
+    "business_context": "Fintech payment processing platform",
+    "program_type": "public HackerOne",
+    "credentials": {"test@example.com": "password123"},
+    "cookies": null,
+    "api_keys": null,
+    "auth_mechanism": "JWT",
+    "source_code": "https://github.com/example/app",
+    "tech_stack": ["React", "Node.js", "PostgreSQL", "AWS"],
+    "api_docs": "https://api.example.com/swagger",
+    "focus_areas": ["IDOR", "SSRF", "business logic"],
+    "staging_env": "https://staging.example.com",
+    "previous_bugs": ["CVE-2024-1234"],
+    "notes": "User mentioned the payment flow is newly deployed"
+  }
+})
+```
+
+**After saving**, proceed with recon and testing normally. Never ask these
+questions again — check `bb_get_context` every session.
 
 ---
 

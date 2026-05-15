@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from functools import wraps
 from flask import Blueprint, request, jsonify, current_app
@@ -332,6 +333,39 @@ def update_program(pid):
     p.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify(p.to_dict())
+
+
+# ── Target Context (pre-hunt Q&A) ────────────────────────────────────────────
+
+
+@api_bp.get("/programs/<int:pid>/context")
+@api_key_required
+def get_target_context(pid):
+    from ..models import TargetContext
+
+    ctx = TargetContext.query.filter_by(program_id=pid).first()
+    if not ctx:
+        return jsonify({"program_id": pid, "data": {}})
+    return jsonify(ctx.to_dict())
+
+
+@api_bp.put("/programs/<int:pid>/context")
+@api_key_required
+def save_target_context(pid):
+    from ..models import TargetContext, Program
+
+    Program.query.get_or_404(pid)
+    data = request.get_json(force=True) or {}
+    payload = data.get("data", data)
+
+    ctx = TargetContext.query.filter_by(program_id=pid).first()
+    if ctx:
+        ctx.data = payload
+    else:
+        ctx = TargetContext(program_id=pid, _data=json.dumps(payload))
+        db.session.add(ctx)
+    db.session.commit()
+    return jsonify(ctx.to_dict()), 201
 
 
 # ── Recon ─────────────────────────────────────────────────────────────────────

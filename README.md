@@ -22,10 +22,10 @@ Not a portal. A **Context Engineering Architecture** that converts your AI agent
            │  triggers skill                     │   example.com"
            ▼                                     ▼
 ┌──────────────────────────┐    ┌──────────────────────────────┐
-│  SKILL.md (207 lines)    │    │  MCP stdio Server            │
-│  • Senior Bug Hunter     │    │  • 12+ tools (CRUD + more)   │
+│  SKILL.md (266 lines)    │    │  MCP stdio Server            │
+│  • Senior Bug Hunter     │    │  • 15+ tools (CRUD + more)   │
 │    persona injected      │    │  • stdio transport           │
-│  • 4 SOPs loaded         │◄──►│  • stateless, fast           │
+│  • 5 SOPs loaded         │◄──►│  • stateless, fast           │
 │  • Severity/Status refs  │    │  • any agent, same API       │
 └──────────┬───────────────┘    └──────────┬───────────────────┘
            │                               │
@@ -62,6 +62,8 @@ bb-huge fixes this at the architectural level:
 | Multiple agents, no coordination | Each agent sets its own `agent` field, stats show all activity |
 | Writing reports is painful | 5 ready-to-use templates (XSS, SQLi, IDOR, SSRF, Stored XSS) |
 | Scope confusion | Standards reference loaded at session start |
+| Testing blind — no creds, no context | SOP-5 questioning layer asks user once, persists forever |
+| Forgetting setup details between sessions | `bb_get_context()` loads all pre-hunt Q&A on every start |
 
 ---
 
@@ -76,7 +78,8 @@ graph TB
     SKILL --> SOP2["SOP-2: Vulnerability Found<br/>Capture-first protocol"]
     SKILL --> SOP3["SOP-3: Resume Finding<br/>Restore full context"]
     SKILL --> SOP4["SOP-4: End Session<br/>Closeout checklist"]
-    SKILL --> MCP["12 MCP Tools<br/>Create, Read, Update,<br/>Upload, Notify, Stats"]
+    SKILL --> SOP5["SOP-5: Pre-Hunt Q&A ⭐<br/>Questioning layer"]
+    SKILL --> MCP["15+ MCP Tools<br/>Create, Read, Update,<br/>Upload, Notify, Stats,<br/>Context, Programs"]
     SKILL --> REFS["Reference Library"]
     REFS --> ORCH[bb-orchestrator.md<br/>Routing & coordination]
     REFS --> OP[bb-operator.md<br/>Hunting methodology]
@@ -91,7 +94,7 @@ graph TB
     style REFS fill:#567,color:#fff
 ```
 
-**~1,300 lines of bug bounty knowledge** — every session. The reference library is lazy-loaded (you only pull what you need), but the core skill & tools are always there.
+**~1,500 lines of bug bounty knowledge** — every session. The reference library is lazy-loaded (you only pull what you need), but the core skill & tools are always there.
 
 ---
 
@@ -185,12 +188,27 @@ cp -r skills/bb-huge ~/.gemini/skills/
 
 Now every time you type `/bb-huge`, the agent loads:
 - Senior Bug Hunter persona with capture-first discipline
-- 4 Standard Operating Procedures (SOP-1 through SOP-4)
+- 5 Standard Operating Procedures (SOP-1 through SOP-5)
 - Full severity & status reference
 - 6 reference files (600+ lines of methodology)
-- 12 MCP tools wired to your portal
+- 15+ MCP tools wired to your portal
 
 **The agent doesn't just "know about" bug bounty. It becomes a bug bounty hunter.**
+
+#### ✅ Expected response when loading
+
+After typing `/bb-huge`, the agent should output something like:
+
+```
+🔵 bb-huge skill loaded — Senior Bug Hunter mode active
+📊 Portal: 42 findings, 5 programs, 3 confirmed, 1 rewarded
+📋 Active programs: Example Corp, Acme Corp
+🔄 Resuming last session: finding #17 (IDOR in user API — debugging)
+❓ What target are we working on today?
+```
+
+If the agent does NOT acknowledge loading, does NOT run the Session
+Initialization Protocol, or seems confused → [run the theory quiz](THEORY_QUIZ.md).
 
 </details>
 
@@ -330,6 +348,20 @@ GET    /api/v1/findings/<id>
 PATCH  /api/v1/findings/<id>
 PATCH  /api/v1/findings/<id>/status
 DELETE /api/v1/findings/<id>
+GET    /api/v1/findings/similar?target=&cwe=&title=
+GET    /api/v1/programs
+POST   /api/v1/programs
+GET    /api/v1/programs/<id>
+PATCH  /api/v1/programs/<id>
+GET    /api/v1/programs/<id>/context       # Pre-hunt Q&A data
+PUT    /api/v1/programs/<id>/context       # Save pre-hunt Q&A data
+GET    /api/v1/programs/<id>/recon
+POST   /api/v1/programs/<id>/recon
+DELETE /api/v1/recon/<id>
+POST   /api/v1/findings/<id>/notes
+DELETE /api/v1/notes/<id>
+PATCH  /api/v1/findings/bulk/status
+POST   /api/v1/notify
 GET    /api/v1/enums
 ```
 
@@ -341,6 +373,19 @@ curl -X POST http://localhost:5000/api/v1/findings \
   -H "Content-Type: application/json" \
   -d '{"title":"Reflected XSS in search","target":"app.example.com","severity":"high","cwe":"CWE-79","cvss":7.2}'
 ```
+
+</details>
+
+<details>
+<summary><strong>🧪 Run the Theory Quiz (test your agent)</strong></summary>
+
+After loading `/bb-huge`, run the [Theory Quiz](THEORY_QUIZ.md) to verify
+your agent fully understands the skill. 10 questions covering architecture,
+SOPs, tools, and workflow.
+
+**Pass threshold:** 9/10 correct = agent is production-ready.
+**Fail?** [Open an issue](https://github.com/ShulkwiSEC/bb-huge/issues/new) with
+the agent's output and question number.
 
 </details>
 
@@ -375,8 +420,8 @@ That's the whole command. The `Dockerfile` + `docker-compose.yml` handle the res
 bb-huge/
 ├── app/
 │   ├── __init__.py            # Flask app factory
-│   ├── models.py              # 6 models: Finding, Attachment, Program,
-│   │                          #   ReconEntry, Note, WebhookConfig
+│   ├── models.py              # 7 models: Finding, Attachment, Program,
+│   │                          #   ReconEntry, Note, WebhookConfig, TargetContext
 │   ├── routes/
 │   │   ├── auth.py            # Login / logout
 │   │   ├── findings.py        # Web UI: CRUD, upload, CSV export
@@ -387,7 +432,7 @@ bb-huge/
 │   ├── templates/             # 11 Jinja2 templates (dark theme)
 │   └── static/uploads/        # Attachment storage
 ├── skills/bb-huge/
-│   ├── SKILL.md               # The brain — 207 lines of agent instruction
+│   ├── SKILL.md               # The brain — 264 lines of agent instruction
 │   ├── references/
 │   │   ├── bb-orchestrator.md         # Multi-skill routing & coordination
 │   │   ├── bb-operator.md             # Full hunting methodology
@@ -399,9 +444,10 @@ bb-huge/
 │       ├── bb.py                      # CLI helper (stats/list/get/create/status)
 │       ├── bb-dump-attachments.py     # Download all evidence for a finding
 │       └── bb-orchestrator-list-skills.py  # Print available skill roster
-├── mcp_server.py              # MCP stdio server (12+ tools)
+├── mcp_server.py              # MCP stdio server (15+ tools)
+├── THEORY_QUIZ.md             # 10-question agent comprehension test
 ├── config.py                  # App configuration
-├── run.py                     # Entry point (Waitress)
+├── run.py                     # Entry point (Flask / Waitress)
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
