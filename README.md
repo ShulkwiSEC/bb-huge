@@ -5,7 +5,7 @@
 Not a portal. A **Context Engineering Architecture** that converts your AI agent into a disciplined bug bounty hunter with a single slash command. The web UI is just the visible tip — the real power is what happens inside the agent's brain when the skill fires.
 
 <!-- Demo Video -->
-<video src="https://github.com/user-attachments/assets/02aaa777-1fd0-41f2-9dd1-5dee021fcb6a"
+<video src="/assets/vedios/bb-huge.mp4"
        autoplay loop muted playsinline controls width="100%">
 </video>
 
@@ -197,15 +197,29 @@ Now every time you type `/bb-huge`, the agent loads:
 
 #### ✅ Expected response when loading
 
-After typing `/bb-huge`, the agent should output something like:
+After typing `/bb-huge`, the agent will acknowledge the injected methodology and prep the session. 
 
-```
-🔵 bb-huge skill loaded — Senior Bug Hunter mode active
-📊 Portal: 42 findings, 5 programs, 3 confirmed, 1 rewarded
-📋 Active programs: Example Corp, Acme Corp
-🔄 Resuming last session: finding #17 (IDOR in user API — debugging)
+<table>
+  <tr>
+    <th width="50%">Terminal / Text Output</th>
+    <th width="50%">Agent SOP Execution</th>
+  </tr>
+  <tr>
+    <td valign="top">
+<pre>
+🔵 bb-huge skill loaded 
+— Senior Bug Hunter mode active
+📊 Portal: 42 findings, 5 programs
+🔄 Resuming last session: finding #17
 ❓ What target are we working on today?
-```
+</pre>
+    </td>
+    <td valign="top">
+      <!-- Replace the src with your actual image URL -->
+      <img src="/assets/images/OPENCODE_TODS_SOPs.png" alt="Agent mapping SOPs as a todo list" width="100%">
+    </td>
+  </tr>
+</table>
 
 If the agent does NOT acknowledge loading, does NOT run the Session
 Initialization Protocol, or seems confused → [run the theory quiz](THEORY_QUIZ.md).
