@@ -9,12 +9,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:-super-secret-flask-key-change-me}
       DEV_KEY: ${DEV_KEY:-bb-huge-dev-key-change-me}
       FLASK_PORT: "5000"
-      FLASK_DEBUG: "0"
+      FLASK_DEBUG: "1"
     volumes:
       # Persist the database
       - bb_huge_db:/app/instance
-      # Persist uploads
-      - bb_huge_uploads:/app/app/static/uploads
+      # Hot-reload mounts — source code reflected instantly
+      - ./app:/app/app
+      - ./skills:/app/skills
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/login')"]
       interval: 30s
@@ -24,4 +25,3 @@ services:
 
 volumes:
   bb_huge_db:
-  bb_huge_uploads:

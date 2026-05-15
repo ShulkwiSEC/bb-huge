@@ -37,13 +37,67 @@ All portal operations use the `bb-huge` MCP server. Auth is handled via the
 | `bb_get_finding` | Pull full details of one finding |
 | `bb_update_finding` | Add PoC, description, CWE, or any field |
 | `bb_update_status` | Advance the status through the workflow |
-| `bb_upload_attachment` | Attach screenshots, Burp exports, or scripts |
 | `bb_delete_finding` | Remove a finding (use sparingly) |
+| `bb_search_similar` | Check for existing duplicates before creating a finding |
+| `bb_upload_attachment` | Attach screenshots, Burp exports, or scripts |
+| `bb_add_note` | Log progress, dead ends, or partial findings without overwriting fields |
+| `bb_bulk_update_status` | Update status of multiple findings at once |
+| `bb_list_programs` | Look up programs to find their IDs |
+| `bb_create_program` | Create a new bug bounty program entry with scope |
+| `bb_add_recon` | Log recon data (subdomains, endpoints, tech) under a program |
 | `bb_get_stats` | Dashboard summary — totals by severity/status/agent |
+| `bb_notify` | Send an alert to Discord/Telegram webhooks |
 
 **Agent identity rule**: Always set `agent` to the identity of whoever is
 running (`gemini-cli`, `claude`, `claude-code`, `emmu`, `codex`). Never use
 `manual` unless a human is entering directly through the web UI.
+
+---
+
+## Linking Findings to Programs
+
+Findings can be linked to Programs in bb-huge. This keeps your reports organized
+by target and lets you track scope, recon data, and payouts per program.
+
+**2-step workflow:**
+
+1. **Look up or create the program** — call `bb_list_programs()` to search for an
+   existing program. If it doesn't exist, call `bb_create_program()` with `name`
+   (target domain/program name) and optional `platform`, `program_url`,
+   `scope_in`, `scope_out`.
+2. **Pass the program_id** — include `program_id: <id>` in `bb_create_finding()`
+   to link the finding.
+
+**Lookup example:**
+```json
+bb_list_programs()
+// → returns [{ id: 1, name: "Example Corp", platform: "HackerOne" }, ...]
+```
+
+**Create program if not found:**
+```json
+bb_create_program({
+  "name": "Example Corp",
+  "platform": "HackerOne",
+  "program_url": "https://hackerone.com/example",
+  "scope_in": "*.example.com"
+})
+// → returns { id: 2, name: "Example Corp" }
+```
+
+**Create finding linked to program:**
+```json
+bb_create_finding({
+  "title": "IDOR in user profile API",
+  "target": "api.example.com",
+  "severity": "high",
+  "program_id": 2,
+  "agent": "claude"
+})
+```
+
+Always call `bb_list_programs()` before `bb_create_finding()` to check if a
+program already exists. Never create duplicate programs.
 
 ---
 
@@ -87,7 +141,9 @@ Move through the chain as evidence accumulates. Never skip statuses.
 
 When a vulnerability is discovered during any session:
 
-1. **Immediately** call `bb_create_finding` with `status: discovered`.
+1. **Immediately** call `bb_list_programs()` to find the target program's `id`,
+   then call `bb_create_finding` with `status: discovered` and `program_id` if
+   a matching program exists.
 2. Fill title, target, severity, agent — even if description is thin.
 3. If local evidence files exist (Burp exports, scripts, logs, screenshots),
    call `bb_upload_attachment` right after creation using the returned `id`.
@@ -124,7 +180,8 @@ Environment variables (set in shell or `.env` before running):
    to anchor notes as recon progresses. Update it as sub-findings emerge.
 
 ### SOP-2 · Vulnerability Found
-1. `bb_create_finding` — `status: discovered` — fill every known field.
+1. `bb_list_programs()` → find program `id` → `bb_create_finding` with
+   `status: discovered` and `program_id` — fill every known field.
 2. `bb_upload_attachment` — any local evidence that exists right now.
 3. Note the context of discovery in `description` (what you were testing, what
    parameter, what endpoint).

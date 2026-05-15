@@ -22,11 +22,48 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
+
+    @keyframes logoReveal {
+      0% { opacity: 0; transform: scale(0.8) translateY(20px); filter: blur(4px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+    }
+    @keyframes taglineFade {
+      0% { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes cardSlide {
+      0% { opacity: 0; transform: translateY(30px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes bgPulse {
+      0%, 100% { opacity: 0.03; }
+      50% { opacity: 0.06; }
+    }
+    @keyframes gridShift {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-20px); }
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      top: -50%; left: -50%; width: 200%; height: 200%;
+      background-image:
+        radial-gradient(circle at 50% 50%, rgba(138, 122, 255, 0.04) 0%, transparent 30%),
+        repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255, 255, 255, 0.008) 40px, rgba(255, 255, 255, 0.008) 41px),
+        repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255, 255, 255, 0.008) 40px, rgba(255, 255, 255, 0.008) 41px);
+      animation: bgPulse 4s ease-in-out infinite, gridShift 8s linear infinite;
+      pointer-events: none;
+    }
+
     .login-wrap {
       width: 100%;
       max-width: 380px;
       padding: 24px;
+      position: relative;
+      z-index: 1;
     }
     .logo {
       font-family: var(--mono);
@@ -35,6 +72,7 @@
       color: var(--accent2);
       text-align: center;
       margin-bottom: 6px;
+      animation: logoReveal 0.6s ease-out;
     }
     .logo span { color: var(--muted); }
     .tagline {
@@ -42,12 +80,14 @@
       color: var(--muted);
       font-size: 13px;
       margin-bottom: 32px;
+      animation: taglineFade 0.5s ease-out 0.3s both;
     }
     .card {
       background: var(--bg2);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 28px;
+      animation: cardSlide 0.5s ease-out 0.5s both;
     }
     label {
       display: block;
@@ -68,10 +108,13 @@
       font-size: 14px;
       width: 100%;
       outline: none;
-      transition: border-color .15s;
+      transition: border-color .15s, box-shadow 0.2s;
       letter-spacing: 2px;
     }
-    input[type=password]:focus { border-color: var(--accent); }
+    input[type=password]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124,106,255,0.15);
+    }
     .btn {
       width: 100%;
       margin-top: 18px;
@@ -84,9 +127,10 @@
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: opacity .15s;
+      transition: opacity .15s, transform 0.1s;
     }
-    .btn:hover { opacity: .85; }
+    .btn:hover { opacity: .85; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
     .error {
       margin-top: 14px;
       padding: 10px 14px;
@@ -95,6 +139,7 @@
       color: #ff4d6d;
       border-radius: 7px;
       font-size: 13px;
+      animation: cardSlide 0.3s ease-out;
     }
   </style>
 </head>

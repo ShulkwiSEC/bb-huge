@@ -23,6 +23,7 @@
   }
   .meta-pill strong { color: var(--text); }
   .meta-pill.mono strong { font-family: var(--mono); }
+  .meta-pill.program-pill { border-color: rgba(138,122,255,0.25); background: rgba(138,122,255,0.08); }
 
   .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
   .tab-btn {
@@ -33,7 +34,7 @@
   }
   .tab-btn:hover { color: var(--text); }
   .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
-  .tab-panel { display: none; }
+  .tab-panel { display: none; animation: fadeIn 0.2s ease-out; }
   .tab-panel.active { display: block; }
 
   .status-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -50,7 +51,9 @@
     border-radius: 8px;
     padding: 12px 14px;
     display: flex; align-items: center; gap: 10px;
+    transition: border-color 0.2s;
   }
+  .attachment-card:hover { border-color: var(--border2); }
   .attachment-icon { font-size: 20px; flex-shrink: 0; }
   .attachment-name {
     font-size: 12px; color: var(--text);
@@ -87,6 +90,39 @@
   }
   .info-box .ib-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; font-weight: 600; margin-bottom: 6px; }
   .info-box .ib-value { font-size: 13px; font-weight: 500; }
+
+  .note-timeline { position: relative; padding-left: 24px; }
+  .note-timeline::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+  .note-entry {
+    position: relative;
+    margin-bottom: 16px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .note-entry::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 16px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+  }
+
+  #program-switch { width: auto; min-width: 180px; padding: 6px 10px; font-size: 12px; }
 </style>
 {% endblock %}
 
@@ -107,6 +143,11 @@
         <span class="meta-pill">{{ finding.platform }}</span>
         {% if finding.cwe %}
         <span class="meta-pill mono"><strong>{{ finding.cwe }}</strong></span>
+        {% endif %}
+        {% if finding.program %}
+        <span class="meta-pill program-pill">
+          📋 <a href="{{ url_for('programs.detail', pid=finding.program.id) }}" style="color:var(--accent2);text-decoration:none"><strong>{{ finding.program.name }}</strong></a>
+        </span>
         {% endif %}
       </div>
     </div>
@@ -148,6 +189,25 @@
     <div class="info-box">
       <div class="ib-label">Attachments</div>
       <div class="ib-value">{{ finding.attachments|length }}</div>
+    </div>
+    <!-- Program linking -->
+    <div class="info-box">
+      <div class="ib-label">Program</div>
+      <div class="ib-value">
+        {% if finding.program %}
+          <span style="font-size:13px">{{ finding.program.name }}</span>
+        {% else %}
+          <span class="text-muted" style="font-size:12px">Not linked</span>
+        {% endif %}
+        <form method="POST" action="{{ url_for('findings.update_program', fid=finding.id) }}" style="display:inline;margin-left:8px" id="program-form">
+          <select name="program_id" id="program-switch" onchange="this.form.submit()">
+            <option value="">— None —</option>
+            {% for p in programs %}
+            <option value="{{ p.id }}" {{ 'selected' if finding.program and finding.program.id == p.id }}>{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -230,12 +290,14 @@
       {% else %}
         <div class="text-muted" style="padding:20px 0">No attachments.</div>
       {% endif %}
+    </div>
+
     <!-- Notes / Activity log -->
-    <div id="tab-notes" class="tab-panel" id="notes">
+    <div id="tab-notes" class="tab-panel">
       {% if finding.notes %}
-        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px">
+        <div class="note-timeline">
           {% for note in finding.notes %}
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+          <div class="note-entry">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
               <span style="font-size:11px;font-family:var(--mono);color:var(--accent2)">{{ note.agent }}</span>
               <div style="display:flex;align-items:center;gap:8px">
@@ -257,7 +319,7 @@
       {% endif %}
 
       <!-- Add note form -->
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:16px">
         <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">
           + Add Note
         </div>
@@ -277,6 +339,8 @@
       </div>
     </div>
   </div>
+
+  <!-- Danger zone -->
   <div class="danger-zone">
     <h3>⚠ Danger Zone</h3>
     <form method="POST" action="{{ url_for('findings.delete_finding', fid=finding.id) }}"
@@ -292,7 +356,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
-  // Render markdown
   marked.setOptions({ breaks: true, gfm: true });
   ['md-description', 'md-poc'].forEach(id => {
     const el = document.getElementById(id);

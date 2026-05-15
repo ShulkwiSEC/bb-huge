@@ -23,9 +23,10 @@ from typing import Any
 # ── Silence ALL stderr output immediately ─────────────────────────────────────
 # gemini-cli (and most MCP clients) treat ANY non-JSON on stdout as a protocol
 # error and close the connection.  Route everything to a log file instead.
-_LOG_FILE = os.environ.get("BB_MCP_LOG", os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "mcp_server.log"
-))
+_LOG_FILE = os.environ.get(
+    "BB_MCP_LOG",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp_server.log"),
+)
 logging.basicConfig(
     filename=_LOG_FILE,
     level=logging.DEBUG,
@@ -36,15 +37,16 @@ sys.stderr = open(_LOG_FILE, "a", buffering=1)
 
 # ── Config ───────────────────────────────────────────────────────────────────
 BASE_URL = os.environ.get("BB_HUGE_URL", "http://127.0.0.1:5000")
-DEV_KEY  = os.environ.get("DEV_KEY", "shulkwisec_123")
-HEADERS  = {"Content-Type": "application/json", "X-Dev-Key": DEV_KEY}
+DEV_KEY = os.environ.get("DEV_KEY", "shulkwisec_123")
+HEADERS = {"Content-Type": "application/json", "X-Dev-Key": DEV_KEY}
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
 
+
 def _req(method: str, path: str, body: dict = None) -> Any:
-    url  = f"{BASE_URL}/api/v1{path}"
+    url = f"{BASE_URL}/api/v1{path}"
     data = json.dumps(body).encode() if body else None
-    req  = urllib.request.Request(url, data=data, headers=HEADERS, method=method)
+    req = urllib.request.Request(url, data=data, headers=HEADERS, method=method)
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             return json.loads(r.read())
@@ -54,10 +56,20 @@ def _req(method: str, path: str, body: dict = None) -> Any:
         return {"error": str(e)}
 
 
-def api_get(path):      return _req("GET",    path)
-def api_post(path, b):  return _req("POST",   path, b)
-def api_patch(path, b): return _req("PATCH",  path, b)
-def api_delete(path):   return _req("DELETE", path)
+def api_get(path):
+    return _req("GET", path)
+
+
+def api_post(path, b):
+    return _req("POST", path, b)
+
+
+def api_patch(path, b):
+    return _req("PATCH", path, b)
+
+
+def api_delete(path):
+    return _req("DELETE", path)
 
 
 # ── Tool definitions ──────────────────────────────────────────────────────────
@@ -73,16 +85,63 @@ TOOLS = [
             "type": "object",
             "required": ["title", "target", "severity"],
             "properties": {
-                "title":       {"type": "string",  "description": "Short descriptive title of the finding"},
-                "target":      {"type": "string",  "description": "Target domain or program name"},
-                "platform":    {"type": "string",  "description": "Bug bounty platform (HackerOne, Bugcrowd, private…)"},
-                "severity":    {"type": "string",  "enum": ["critical","high","medium","low","informational"]},
-                "status":      {"type": "string",  "enum": ["discovered","debugging","confirmed","reported","rewarded","denied","duplicate","n/a"], "default": "discovered"},
-                "agent":       {"type": "string",  "enum": ["gemini-cli","claude-code","claude","codex","emmu","manual","other"], "default": "gemini-cli"},
-                "cwe":         {"type": "string",  "description": "CWE identifier e.g. CWE-79"},
-                "cvss":        {"type": "number",  "description": "CVSS score 0-10"},
-                "description": {"type": "string",  "description": "Markdown description of the vulnerability"},
-                "poc":         {"type": "string",  "description": "Markdown proof of concept and steps to reproduce"},
+                "title": {
+                    "type": "string",
+                    "description": "Short descriptive title of the finding",
+                },
+                "target": {
+                    "type": "string",
+                    "description": "Target domain or program name",
+                },
+                "program_id": {
+                    "type": "integer",
+                    "description": "Program ID to link this finding to",
+                },
+                "platform": {
+                    "type": "string",
+                    "description": "Bug bounty platform (HackerOne, Bugcrowd, private…)",
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "informational"],
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "discovered",
+                        "debugging",
+                        "confirmed",
+                        "reported",
+                        "rewarded",
+                        "denied",
+                        "duplicate",
+                        "n/a",
+                    ],
+                    "default": "discovered",
+                },
+                "agent": {
+                    "type": "string",
+                    "enum": [
+                        "gemini-cli",
+                        "claude-code",
+                        "claude",
+                        "codex",
+                        "emmu",
+                        "manual",
+                        "other",
+                    ],
+                    "default": "gemini-cli",
+                },
+                "cwe": {"type": "string", "description": "CWE identifier e.g. CWE-79"},
+                "cvss": {"type": "number", "description": "CVSS score 0-10"},
+                "description": {
+                    "type": "string",
+                    "description": "Markdown description of the vulnerability",
+                },
+                "poc": {
+                    "type": "string",
+                    "description": "Markdown proof of concept and steps to reproduce",
+                },
             },
         },
     },
@@ -92,12 +151,28 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "q":        {"type": "string",  "description": "Search query"},
-                "severity": {"type": "string",  "enum": ["critical","high","medium","low","informational",""]},
-                "status":   {"type": "string",  "enum": ["discovered","debugging","confirmed","reported","rewarded","denied","duplicate","n/a",""]},
-                "agent":    {"type": "string",  "description": "Filter by agent"},
-                "limit":    {"type": "integer", "default": 20},
-                "offset":   {"type": "integer", "default": 0},
+                "q": {"type": "string", "description": "Search query"},
+                "severity": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "informational", ""],
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "discovered",
+                        "debugging",
+                        "confirmed",
+                        "reported",
+                        "rewarded",
+                        "denied",
+                        "duplicate",
+                        "n/a",
+                        "",
+                    ],
+                },
+                "agent": {"type": "string", "description": "Filter by agent"},
+                "limit": {"type": "integer", "default": 20},
+                "offset": {"type": "integer", "default": 0},
             },
         },
     },
@@ -119,17 +194,32 @@ TOOLS = [
             "type": "object",
             "required": ["id"],
             "properties": {
-                "id":          {"type": "integer"},
-                "title":       {"type": "string"},
-                "target":      {"type": "string"},
-                "platform":    {"type": "string"},
-                "severity":    {"type": "string",  "enum": ["critical","high","medium","low","informational"]},
-                "status":      {"type": "string",  "enum": ["discovered","debugging","confirmed","reported","rewarded","denied","duplicate","n/a"]},
-                "agent":       {"type": "string"},
-                "cwe":         {"type": "string"},
-                "cvss":        {"type": "number"},
+                "id": {"type": "integer"},
+                "title": {"type": "string"},
+                "target": {"type": "string"},
+                "platform": {"type": "string"},
+                "severity": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "informational"],
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "discovered",
+                        "debugging",
+                        "confirmed",
+                        "reported",
+                        "rewarded",
+                        "denied",
+                        "duplicate",
+                        "n/a",
+                    ],
+                },
+                "agent": {"type": "string"},
+                "cwe": {"type": "string"},
+                "cvss": {"type": "number"},
                 "description": {"type": "string"},
-                "poc":         {"type": "string"},
+                "poc": {"type": "string"},
             },
         },
     },
@@ -140,8 +230,20 @@ TOOLS = [
             "type": "object",
             "required": ["id", "status"],
             "properties": {
-                "id":     {"type": "integer"},
-                "status": {"type": "string", "enum": ["discovered","debugging","confirmed","reported","rewarded","denied","duplicate","n/a"]},
+                "id": {"type": "integer"},
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "discovered",
+                        "debugging",
+                        "confirmed",
+                        "reported",
+                        "rewarded",
+                        "denied",
+                        "duplicate",
+                        "n/a",
+                    ],
+                },
             },
         },
     },
@@ -168,8 +270,11 @@ TOOLS = [
             "type": "object",
             "required": ["id", "file_path"],
             "properties": {
-                "id":        {"type": "integer", "description": "Finding ID"},
-                "file_path": {"type": "string",  "description": "Absolute or relative path to the file on disk"},
+                "id": {"type": "integer", "description": "Finding ID"},
+                "file_path": {
+                    "type": "string",
+                    "description": "Absolute or relative path to the file on disk",
+                },
             },
         },
     },
@@ -182,9 +287,15 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "target": {"type": "string", "description": "Target domain or program name"},
-                "cwe":    {"type": "string", "description": "CWE identifier e.g. CWE-79"},
-                "title":  {"type": "string", "description": "Keywords from the finding title"},
+                "target": {
+                    "type": "string",
+                    "description": "Target domain or program name",
+                },
+                "cwe": {"type": "string", "description": "CWE identifier e.g. CWE-79"},
+                "title": {
+                    "type": "string",
+                    "description": "Keywords from the finding title",
+                },
             },
         },
     },
@@ -195,9 +306,12 @@ TOOLS = [
             "type": "object",
             "required": ["id", "content"],
             "properties": {
-                "id":      {"type": "integer", "description": "Finding ID"},
-                "content": {"type": "string",  "description": "Markdown note content"},
-                "agent":   {"type": "string",  "description": "Agent name (defaults to 'manual')"},
+                "id": {"type": "integer", "description": "Finding ID"},
+                "content": {"type": "string", "description": "Markdown note content"},
+                "agent": {
+                    "type": "string",
+                    "description": "Agent name (defaults to 'manual')",
+                },
             },
         },
     },
@@ -208,8 +322,24 @@ TOOLS = [
             "type": "object",
             "required": ["ids", "status"],
             "properties": {
-                "ids":    {"type": "array",  "items": {"type": "integer"}, "description": "List of finding IDs"},
-                "status": {"type": "string", "enum": ["discovered","debugging","confirmed","reported","rewarded","denied","duplicate","n/a"]},
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "List of finding IDs",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "discovered",
+                        "debugging",
+                        "confirmed",
+                        "reported",
+                        "rewarded",
+                        "denied",
+                        "duplicate",
+                        "n/a",
+                    ],
+                },
             },
         },
     },
@@ -220,12 +350,16 @@ TOOLS = [
             "type": "object",
             "required": ["payload"],
             "properties": {
-                "event":   {"type": "string", "description": "Event name e.g. finding.confirmed", "default": "finding.created"},
+                "event": {
+                    "type": "string",
+                    "description": "Event name e.g. finding.confirmed",
+                    "default": "finding.created",
+                },
                 "payload": {
                     "type": "object",
                     "description": "Notification content",
                     "properties": {
-                        "title":   {"type": "string"},
+                        "title": {"type": "string"},
                         "message": {"type": "string"},
                     },
                 },
@@ -239,12 +373,30 @@ TOOLS = [
             "type": "object",
             "required": ["name"],
             "properties": {
-                "name":        {"type": "string", "description": "Program name e.g. Acme Corp"},
-                "platform":    {"type": "string", "description": "HackerOne, Bugcrowd, Intigriti, private…"},
-                "program_url": {"type": "string", "description": "URL to the program page"},
-                "scope_in":    {"type": "string", "description": "In-scope rules (Markdown)"},
-                "scope_out":   {"type": "string", "description": "Out-of-scope rules (Markdown)"},
-                "notes":       {"type": "string", "description": "General notes about this program"},
+                "name": {
+                    "type": "string",
+                    "description": "Program name e.g. Acme Corp",
+                },
+                "platform": {
+                    "type": "string",
+                    "description": "HackerOne, Bugcrowd, Intigriti, private…",
+                },
+                "program_url": {
+                    "type": "string",
+                    "description": "URL to the program page",
+                },
+                "scope_in": {
+                    "type": "string",
+                    "description": "In-scope rules (Markdown)",
+                },
+                "scope_out": {
+                    "type": "string",
+                    "description": "Out-of-scope rules (Markdown)",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "General notes about this program",
+                },
             },
         },
     },
@@ -261,10 +413,28 @@ TOOLS = [
             "required": ["program_id", "value"],
             "properties": {
                 "program_id": {"type": "integer"},
-                "category":   {"type": "string", "enum": ["subdomain","endpoint","technology","parameter","credential","ip","other"], "default": "subdomain"},
-                "value":      {"type": "string", "description": "The actual data (domain, URL, tech name…)"},
-                "notes":      {"type": "string"},
-                "source":     {"type": "string", "description": "Tool or agent that found this"},
+                "category": {
+                    "type": "string",
+                    "enum": [
+                        "subdomain",
+                        "endpoint",
+                        "technology",
+                        "parameter",
+                        "credential",
+                        "ip",
+                        "other",
+                    ],
+                    "default": "subdomain",
+                },
+                "value": {
+                    "type": "string",
+                    "description": "The actual data (domain, URL, tech name…)",
+                },
+                "notes": {"type": "string"},
+                "source": {
+                    "type": "string",
+                    "description": "Tool or agent that found this",
+                },
             },
         },
     },
@@ -272,6 +442,7 @@ TOOLS = [
 
 
 # ── MCP message handlers ──────────────────────────────────────────────────────
+
 
 def handle_initialize(msg_id, params):
     return {
@@ -290,8 +461,8 @@ def handle_tools_list(msg_id):
 
 
 def handle_tool_call(msg_id, params):
-    name  = params.get("name", "")
-    args  = params.get("arguments", {})
+    name = params.get("name", "")
+    args = params.get("arguments", {})
 
     try:
         result = dispatch(name, args)
@@ -333,15 +504,16 @@ def dispatch(name: str, args: dict) -> Any:
 
     elif name == "bb_upload_attachment":
         import base64
+
         fid = args["id"]
         path = args["file_path"]
         try:
             with open(path, "rb") as f:
                 content = base64.b64encode(f.read()).decode()
-            return api_post(f"/findings/{fid}/attachments", {
-                "filename": os.path.basename(path),
-                "content": content
-            })
+            return api_post(
+                f"/findings/{fid}/attachments",
+                {"filename": os.path.basename(path), "content": content},
+            )
         except Exception as e:
             return {"error": str(e)}
 
@@ -375,6 +547,7 @@ def dispatch(name: str, args: dict) -> Any:
 
 # ── stdio loop ────────────────────────────────────────────────────────────────
 
+
 def _send(obj: dict) -> None:
     """Write a single JSON-RPC response to stdout, always line-buffered."""
     sys.stdout.write(json.dumps(obj) + "\n")
@@ -392,7 +565,7 @@ def main():
             logging.error("stdin read error: %s", e)
             break
 
-        if not raw:          # EOF — client closed the pipe
+        if not raw:  # EOF — client closed the pipe
             break
 
         line = raw.strip()
@@ -400,9 +573,9 @@ def main():
             continue
 
         try:
-            msg    = json.loads(line)
+            msg = json.loads(line)
             method = msg.get("method", "")
-            mid    = msg.get("id")
+            mid = msg.get("id")
             logging.debug("→ %s id=%s", method, mid)
 
             if method == "initialize":
@@ -412,22 +585,31 @@ def main():
             elif method == "tools/call":
                 _send(handle_tool_call(mid, msg.get("params", {})))
             elif method in ("notifications/initialized", "notifications/cancelled"):
-                pass   # fire-and-forget, no response needed
+                pass  # fire-and-forget, no response needed
             elif mid is not None:
-                _send({
-                    "jsonrpc": "2.0", "id": mid,
-                    "error": {"code": -32601, "message": f"Method not found: {method}"},
-                })
+                _send(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": mid,
+                        "error": {
+                            "code": -32601,
+                            "message": f"Method not found: {method}",
+                        },
+                    }
+                )
 
         except json.JSONDecodeError as e:
             logging.warning("bad JSON: %s | raw: %s", e, raw[:120])
         except Exception as e:
             logging.exception("unhandled error")
             try:
-                _send({
-                    "jsonrpc": "2.0", "id": None,
-                    "error": {"code": -32603, "message": str(e)},
-                })
+                _send(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": None,
+                        "error": {"code": -32603, "message": str(e)},
+                    }
+                )
             except Exception:
                 pass
 

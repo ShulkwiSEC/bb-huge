@@ -14,7 +14,15 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 18px 20px;
+    transition: border-color 0.2s, transform 0.15s;
+    animation: fadeIn 0.4s ease-out;
   }
+  .stat-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .stat-card:nth-child(1) { animation-delay: 0s; }
+  .stat-card:nth-child(2) { animation-delay: 0.05s; }
+  .stat-card:nth-child(3) { animation-delay: 0.1s; }
+  .stat-card:nth-child(4) { animation-delay: 0.15s; }
+  .stat-card:nth-child(5) { animation-delay: 0.2s; }
   .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; margin-bottom: 6px; }
   .stat-value { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; }
   .stat-critical { color: var(--critical); }
@@ -30,7 +38,7 @@
   .bar-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .bar-label { width: 90px; color: var(--muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
   .bar-track { flex: 1; background: var(--bg3); border-radius: 3px; height: 6px; overflow: hidden; }
-  .bar-fill  { height: 100%; border-radius: 3px; transition: width .4s; }
+  .bar-fill  { height: 100%; border-radius: 3px; transition: width .6s ease-out; }
   .bar-count { color: var(--muted); font-family: var(--mono); font-size: 11px; min-width: 24px; text-align: right; }
 
   .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px; }
@@ -49,6 +57,54 @@
     padding: 2px 7px;
     border-radius: 4px;
   }
+
+  .quick-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .quick-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 18px;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    transition: 0.2s;
+  }
+  .quick-action:hover {
+    border-color: var(--accent);
+    background: rgba(138,122,255,0.05);
+  }
+  .quick-action-icon { font-size: 18px; }
+
+  .program-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .program-mini {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-decoration: none;
+    color: var(--text);
+    transition: 0.2s;
+  }
+  .program-mini:hover { border-color: var(--accent); }
+  .program-mini-name { font-size: 13px; font-weight: 600; }
+  .program-mini-stats { display: flex; gap: 8px; margin-top: 6px; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .program-mini-stats .crit { color: var(--critical); }
+  .program-mini-stats .hi { color: var(--high); }
+  .program-mini-stats .rwd { color: #00ffb3; }
 </style>
 {% endblock %}
 
@@ -58,7 +114,7 @@
   <div class="page-header">
     <div>
       <div class="page-title">Dashboard</div>
-      <div class="text-muted" style="font-size:13px;margin-top:2px">bug bounty - huge 🤗 overview</div>
+      <div class="text-muted" style="font-size:13px;margin-top:2px">bug bounty — huge 🤗</div>
     </div>
   </div>
 
@@ -84,6 +140,22 @@
       <div class="stat-label">Rewarded 💰</div>
       <div class="stat-value stat-rewarded">{{ rewarded }}</div>
     </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="quick-actions">
+    <a href="{{ url_for('findings.add_finding') }}" class="quick-action">
+      <span class="quick-action-icon">📝</span> New Finding
+    </a>
+    <a href="{{ url_for('programs.add_program') }}" class="quick-action">
+      <span class="quick-action-icon">📋</span> New Program
+    </a>
+    <a href="{{ url_for('findings.list_findings', severity='critical') }}" class="quick-action">
+      <span class="quick-action-icon">🔴</span> Critical Findings
+    </a>
+    <a href="{{ url_for('findings.list_findings', status='confirmed') }}" class="quick-action">
+      <span class="quick-action-icon">✅</span> Confirmed (unreported)
+    </a>
   </div>
 
   <!-- Mini charts row -->
@@ -145,6 +217,30 @@
     </div>
   </div>
 
+  <!-- Programs -->
+  {% if programs %}
+  <div class="card" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="section-title" style="margin-bottom:0">Active Programs</div>
+      <a href="{{ url_for('programs.list_programs') }}" class="btn btn-ghost btn-sm">All Programs →</a>
+    </div>
+    <div class="program-mini-grid">
+      {% for p in programs %}
+      {% set s = p.stats() %}
+      <a href="{{ url_for('programs.detail', pid=p.id) }}" class="program-mini">
+        <div class="program-mini-name">{{ p.name }}</div>
+        <div class="program-mini-stats">
+          <span>{{ s.total }} total</span>
+          {% if s.by_severity.critical > 0 %}<span class="crit">{{ s.by_severity.critical }} crit</span>{% endif %}
+          {% if s.by_severity.high > 0 %}<span class="hi">{{ s.by_severity.high }} high</span>{% endif %}
+          {% if s.by_status.rewarded > 0 %}<span class="rwd">{{ s.by_status.rewarded }} 💰</span>{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Recent findings -->
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -159,9 +255,9 @@
             <th>#</th>
             <th>Title</th>
             <th>Target</th>
+            <th>Program</th>
             <th>Severity</th>
             <th>Status</th>
-            <th>Agent</th>
             <th>Date</th>
           </tr>
         </thead>
@@ -171,12 +267,18 @@
             <td class="mono text-muted" style="font-size:11px">{{ f.id }}</td>
             <td><a href="{{ url_for('findings.detail', fid=f.id) }}">{{ f.title }}</a></td>
             <td><span class="target-tag">{{ f.target }}</span></td>
+            <td>
+              {% if f.program %}
+                <a href="{{ url_for('programs.detail', pid=f.program.id) }}" class="text-muted" style="font-size:11px;text-decoration:none;font-family:var(--mono)">{{ f.program.name }}</a>
+              {% else %}
+                <span class="text-muted" style="font-size:11px">—</span>
+              {% endif %}
+            </td>
             <td><span class="badge badge-{{ f.severity }}">{{ f.severity }}</span></td>
             <td>
               {% set sc = f.status.replace('/','').replace('-','') %}
               <span class="badge badge-{{ sc }}">{{ f.status }}</span>
             </td>
-            <td class="text-muted mono" style="font-size:11px">{{ f.agent }}</td>
             <td class="text-muted" style="font-size:12px">
               {{ f.created_at.strftime('%Y-%m-%d') if f.created_at else '—' }}
             </td>

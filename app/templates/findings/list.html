@@ -22,6 +22,7 @@
     min-width: 130px;
     padding: 7px 10px;
     font-size: 13px;
+    transition: border-color 0.2s;
   }
   .filter-actions { display: flex; gap: 6px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
   .count-badge {
@@ -52,6 +53,7 @@
   .cvss-high     { color: var(--high); }
   .cvss-medium   { color: var(--medium); }
   .cvss-low      { color: var(--low); }
+  .auto-submit { transition: opacity 0.2s; }
 </style>
 {% endblock %}
 
@@ -67,7 +69,7 @@
   </div>
 
   <!-- Filters -->
-  <form method="GET" action="{{ url_for('findings.list_findings') }}">
+  <form method="GET" action="{{ url_for('findings.list_findings') }}" id="filter-form">
     <div class="filters">
       <div class="filter-group" style="flex:1;min-width:200px">
         <label>Search</label>
@@ -75,7 +77,7 @@
       </div>
       <div class="filter-group">
         <label>Severity</label>
-        <select name="severity">
+        <select name="severity" class="auto-submit" onchange="this.form.submit()">
           <option value="">All</option>
           {% for s in severities %}
           <option value="{{ s }}" {{ 'selected' if severity == s }}>{{ s }}</option>
@@ -84,7 +86,7 @@
       </div>
       <div class="filter-group">
         <label>Status</label>
-        <select name="status">
+        <select name="status" class="auto-submit" onchange="this.form.submit()">
           <option value="">All</option>
           {% for s in statuses %}
           <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>
@@ -92,8 +94,17 @@
         </select>
       </div>
       <div class="filter-group">
+        <label>Program</label>
+        <select name="program_id" class="auto-submit" onchange="this.form.submit()">
+          <option value="">All</option>
+          {% for p in programs %}
+          <option value="{{ p.id }}" {{ 'selected' if program_id|string == p.id|string }}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-group">
         <label>Agent</label>
-        <select name="agent">
+        <select name="agent" class="auto-submit" onchange="this.form.submit()">
           <option value="">All</option>
           {% for a in agents %}
           <option value="{{ a }}" {{ 'selected' if agent == a }}>{{ a }}</option>
@@ -102,7 +113,7 @@
       </div>
       <div class="filter-group">
         <label>Sort</label>
-        <select name="sort">
+        <select name="sort" class="auto-submit" onchange="this.form.submit()">
           <option value="newest"   {{ 'selected' if sort == 'newest' }}>Newest first</option>
           <option value="oldest"   {{ 'selected' if sort == 'oldest' }}>Oldest first</option>
           <option value="severity" {{ 'selected' if sort == 'severity' }}>By severity</option>
@@ -110,7 +121,6 @@
         </select>
       </div>
       <div class="filter-actions">
-        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
         <a href="{{ url_for('findings.list_findings') }}" class="btn btn-ghost btn-sm">Clear</a>
         <a href="{{ url_for('findings.list_findings', q=q, severity=severity, status=status, agent=agent, export='csv') }}"
            class="btn btn-ghost btn-sm">↓ CSV</a>
@@ -128,9 +138,9 @@
             <th>#</th>
             <th>Title</th>
             <th>Target / Platform</th>
+            <th>Program</th>
             <th>Severity</th>
             <th>CVSS</th>
-            <th>CWE</th>
             <th>Status</th>
             <th>Agent</th>
             <th>Date</th>
@@ -146,6 +156,15 @@
             <td>
               <div style="font-family:var(--mono);font-size:11px;color:var(--text)">{{ f.target }}</div>
               <div style="font-size:11px;color:var(--muted)">{{ f.platform }}</div>
+            </td>
+            <td>
+              {% if f.program %}
+                <a href="{{ url_for('programs.detail', pid=f.program.id) }}" class="text-muted" style="font-size:11px;font-family:var(--mono);text-decoration:none">
+                  {{ f.program.name }}
+                </a>
+              {% else %}
+                <span class="text-muted" style="font-size:11px">—</span>
+              {% endif %}
             </td>
             <td><span class="badge badge-{{ f.severity }}">{{ f.severity }}</span></td>
             <td>
@@ -163,7 +182,6 @@
                 <span class="text-muted">—</span>
               {% endif %}
             </td>
-            <td class="cwe-tag">{{ f.cwe or '—' }}</td>
             <td>
               {% set sc = f.status.replace('/','').replace('-','') %}
               <span class="badge badge-{{ sc }}">{{ f.status }}</span>
@@ -179,7 +197,7 @@
     </div>
     {% else %}
       <div style="text-align:center;padding:60px;color:var(--muted)">
-        {% if q or severity or status or agent %}
+        {% if q or severity or status or agent or program_id %}
           No findings match the current filters.
           <a href="{{ url_for('findings.list_findings') }}" style="color:var(--accent2)">Clear filters</a>
         {% else %}

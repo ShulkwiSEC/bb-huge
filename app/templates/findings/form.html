@@ -15,7 +15,6 @@
     padding: 8px 0; margin: 20px 0 4px;
     border-bottom: 1px solid var(--border);
   }
-  /* EasyMDE dark theme overrides */
   .EasyMDEContainer .CodeMirror {
     background: var(--bg3) !important;
     color: var(--text) !important;
@@ -52,6 +51,18 @@
   }
   .upload-zone:hover { border-color: var(--accent); color: var(--text); }
   .form-actions { display: flex; gap: 10px; margin-top: 28px; }
+  .program-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(138,122,255,0.1);
+    border: 1px solid rgba(138,122,255,0.25);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--accent2);
+    margin-bottom: 16px;
+  }
 </style>
 {% endblock %}
 
@@ -72,6 +83,15 @@
 
   <div class="card">
     <form method="POST" enctype="multipart/form-data">
+
+      {% if program %}
+      <div class="program-indicator">
+        📋 Linked to program: <strong>{{ program.name }}</strong>
+      </div>
+      {% if not finding %}
+      <input type="hidden" name="program_id" value="{{ program.id }}">
+      {% endif %}
+      {% endif %}
 
       <!-- Basic info -->
       <div class="section-divider">Basic Info</div>
@@ -170,7 +190,7 @@
 
       {% if finding and finding.attachments %}
       <div style="margin-top:-8px;margin-bottom:16px">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Existing attachments (manage from detail page):</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Existing attachments:</div>
         {% for att in finding.attachments %}
         <span style="font-size:12px;background:var(--bg3);padding:2px 8px;border-radius:4px;margin-right:6px;margin-bottom:4px;display:inline-block">{{ att.original_name }}</span>
         {% endfor %}
@@ -207,7 +227,6 @@
     });
   });
 
-  // Show selected file names
   document.getElementById('attachments').addEventListener('change', function() {
     const names = Array.from(this.files).map(f => f.name).join(', ');
     document.getElementById('file-list').textContent = names || '';

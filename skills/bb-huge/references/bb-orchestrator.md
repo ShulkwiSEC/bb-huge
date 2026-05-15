@@ -17,6 +17,7 @@ When you receive a task, route it to the correct reference file before acting:
 | "write the report", "format for HackerOne" | → `bb-report-templates.md` |
 | "what methodology should I follow?" | → `bb-operator.md` |
 | "log this finding", "update status", "dump attachments" | → Stay in `SKILL.md` (MCP tools) |
+| "create or look up a program", "add recon to a program" | → Stay in `SKILL.md` (MCP tools) |
 
 **Load only the reference you need.** Do not load all files at once.
 
@@ -31,8 +32,9 @@ When starting any new session or receiving a new target:
 2. Load bb-operator.md                 — get the active methodology
 3. Load bb-standards.md                — confirm what's in scope
 4. bb_list_findings (q=<target>)       — check if prior work exists
-5. If prior work exists → bb_get_finding + bb-dump-attachments.py
-6. Report a one-paragraph status summary before starting any testing
+5. bb_list_programs                    — check if target program exists in portal
+6. If prior work exists → bb_get_finding + bb-dump-attachments.py
+7. Report a one-paragraph status summary before starting any testing
 ```
 
 ---
