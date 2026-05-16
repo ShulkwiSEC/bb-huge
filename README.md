@@ -7,7 +7,7 @@ Not a portal. A **Context Engineering Architecture** that converts your AI agent
 <!-- Demo Video /and ui demo -->
 | | |
 |---|---|
-| [![Demo](assets/images/bb-huge-demo-thumbnail.webp)](https://github.com/user-attachments/assets/a4c49a73-e6b4-4902-b581-1e20abd244a8) | <video src="assets/images/ui-demo.webm" controls width="100%"></video> |
+| [![Demo](assets/images/bb-huge-demo-thumbnail.webp)](https://github.com/user-attachments/assets/a4c49a73-e6b4-4902-b581-1e20abd244a8) | ![Demo](assets/images/ui-demo.webp)|
 
 ---
 
