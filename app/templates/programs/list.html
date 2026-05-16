@@ -5,47 +5,62 @@
 <style>
   .programs-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
-    margin-top: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
   }
   .program-card {
     background: var(--bg2);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: 10px;
+    padding: 16px;
     text-decoration: none;
     display: block;
     transition: border-color .15s, transform .1s;
-    position: relative;
   }
   .program-card:hover { border-color: var(--accent); transform: translateY(-1px); }
   .program-card.inactive { opacity: .5; }
-  .program-name { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-  .program-platform {
-    font-size: 11px; color: var(--muted); font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: .4px; margin-bottom: 14px;
-  }
-  .program-stats { display: flex; gap: 10px; flex-wrap: wrap; }
-  .stat-pill {
-    font-family: var(--mono); font-size: 11px;
-    padding: 3px 8px; border-radius: 5px;
-    background: var(--bg3); color: var(--muted);
-    border: 1px solid var(--border);
-  }
-  .stat-pill.has-critical { color: var(--critical); border-color: rgba(255,77,109,.3); background: rgba(255,77,109,.08); }
-  .stat-pill.has-high     { color: var(--high);     border-color: rgba(255,154,60,.3);  background: rgba(255,154,60,.08); }
-  .inactive-badge {
-    position: absolute; top: 14px; right: 14px;
-    font-size: 10px; color: var(--muted);
+
+  .pc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .pc-logo {
+    width: 32px; height: 32px; border-radius: 8px;
     background: var(--bg3); border: 1px solid var(--border);
-    padding: 2px 7px; border-radius: 4px; font-family: var(--mono);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0;
   }
+  .pc-logo img { width: 20px; height: 20px; object-fit: contain; }
+  .pc-logo-letter { font-size: 14px; font-weight: 700; color: var(--accent2); font-family: var(--mono); }
+  .pc-name { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .pc-platform { font-size: 10px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: .4px; }
+
+  .pc-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .pc-pill {
+    font-family: var(--mono); font-size: 11px;
+    padding: 2px 8px; border-radius: 4px;
+    background: var(--bg3); color: var(--muted); border: 1px solid var(--border);
+  }
+  .pc-pill.crit { color: var(--critical); border-color: rgba(255,77,109,.3); background: rgba(255,77,109,.07); }
+  .pc-pill.high { color: var(--high);     border-color: rgba(255,154,60,.3);  background: rgba(255,154,60,.07); }
+  .pc-pill.conf { color: #06d6a0; border-color: rgba(6,214,160,.3); background: rgba(6,214,160,.07); }
+  .pc-pill.rwd  { color: #00ffb3; border-color: rgba(0,255,179,.3); background: rgba(0,255,179,.07); }
+
+  .pc-bar-track { height: 4px; background: var(--bg3); border-radius: 4px; display: flex; gap: 2px; overflow: hidden; }
+  .pc-bar { height: 100%; border-radius: 4px; }
+
+  .pc-meta { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .pc-meta a { color: var(--accent2); text-decoration: none; }
+  .fopt {
+    padding: 8px 14px; font-size: 12px; font-family: var(--mono);
+    color: var(--muted); cursor: pointer; border: none;
+    background: none; transition: .15s;
+  }
+  .fopt:hover { color: var(--text); background: var(--bg3); }
+  .fopt.active { color: var(--accent2); background: rgba(138,122,255,.1); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
+
   <div class="page-header">
     <div class="page-title">Programs</div>
     <div style="margin-left:auto">
@@ -53,42 +68,139 @@
     </div>
   </div>
 
+    <!-- Filter bar -->
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <input
+      type="text"
+      id="prog-search"
+      placeholder="Search programs…"
+      oninput="applyFilters()"
+      style="flex:1;min-width:180px;padding:8px 12px;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);outline:none"
+    >
+    <div style="display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <button class="fopt active" onclick="setFilter('all',this)">All</button>
+      <button class="fopt" onclick="setFilter('active',this)">Active</button>
+      <button class="fopt" onclick="setFilter('inactive',this)">Inactive</button>
+    </div>
+    <select id="prog-sort" onchange="applyFilters()" style="padding:8px 10px;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+      <option value="default">Sort: Default</option>
+      <option value="name">Name A–Z</option>
+      <option value="findings">Most Findings</option>
+      <option value="critical">Most Critical</option>
+      <option value="rewarded">Most Rewarded</option>
+      <option value="newest">Newest</option>
+      <option value="oldest">Oldest</option>
+    </select>
+  </div>
+
   {% if programs %}
-    <div class="programs-grid">
-      {% for p in programs %}
-      {% set s = p.stats() %}
-      <a href="{{ url_for('programs.detail', pid=p.id) }}"
-         class="program-card {{ 'inactive' if not p.active }}">
-        {% if not p.active %}<span class="inactive-badge">inactive</span>{% endif %}
-        <div class="program-name">{{ p.name }}</div>
-        <div class="program-platform">{{ p.platform }}</div>
-        <div class="program-stats">
-          <span class="stat-pill">{{ s.total }} findings</span>
-          {% if s.by_severity.critical > 0 %}
-          <span class="stat-pill has-critical">{{ s.by_severity.critical }} critical</span>
+  <div class="programs-grid" id="programs-grid">
+    {% for p in programs %}
+    {% set s = p.stats() %}
+    <a href="{{ url_for('programs.detail', pid=p.id) }}"
+       class="program-card {{ 'inactive' if not p.active }}"
+       data-name="{{ p.name|lower }}"
+       data-active="{{ 'true' if p.active else 'false' }}"
+       data-findings="{{ s.total }}"
+       data-critical="{{ s.by_severity.critical }}"
+       data-rewarded="{{ s.by_status.rewarded }}"
+       data-created="{{ p.created_at.strftime('%Y%m%d') if p.created_at else '0' }}">
+
+      <div class="pc-head">
+        <div class="pc-logo">
+          {% if p.program_url %}
+            <img src="https://www.google.com/s2/favicons?domain={{ p.program_url }}&sz=32"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <span class="pc-logo-letter" style="display:none">{{ p.name[0]|upper }}</span>
+          {% else %}
+            <span class="pc-logo-letter">{{ p.name[0]|upper }}</span>
           {% endif %}
-          {% if s.by_severity.high > 0 %}
-          <span class="stat-pill has-high">{{ s.by_severity.high }} high</span>
-          {% endif %}
-          {% if s.by_status.confirmed > 0 %}
-          <span class="stat-pill" style="color:#06d6a0;border-color:rgba(6,214,160,.3);background:rgba(6,214,160,.08)">
-            {{ s.by_status.confirmed }} confirmed
-          </span>
-          {% endif %}
-          {% if s.by_status.rewarded > 0 %}
-          <span class="stat-pill" style="color:#00ffb3;border-color:rgba(0,255,179,.3);background:rgba(0,255,179,.08)">
-            {{ s.by_status.rewarded }} rewarded
-          </span>
-          {% endif %}
-          <span class="stat-pill">{{ p.recon|length }} recon</span>
         </div>
-      </a>
-      {% endfor %}
-    </div>
+        <div>
+          <div class="pc-name">{{ p.name }}</div>
+          <div class="pc-platform">{{ p.platform }}{% if not p.active %} · inactive{% endif %}</div>
+        </div>
+      </div>
+
+      <div class="pc-pills">
+        <span class="pc-pill">{{ s.total }} findings</span>
+        {% if s.by_severity.critical > 0 %}<span class="pc-pill crit">{{ s.by_severity.critical }} crit</span>{% endif %}
+        {% if s.by_severity.high > 0 %}<span class="pc-pill high">{{ s.by_severity.high }} high</span>{% endif %}
+        {% if s.by_status.confirmed > 0 %}<span class="pc-pill conf">{{ s.by_status.confirmed }} confirmed</span>{% endif %}
+        {% if s.by_status.rewarded > 0 %}<span class="pc-pill rwd">{{ s.by_status.rewarded }} rewarded</span>{% endif %}
+        {% if p.recon|length > 0 %}<span class="pc-pill">{{ p.recon|length }} recon</span>{% endif %}
+      </div>
+
+      {% if s.total > 0 %}
+      <div class="pc-bar-track">
+        {% if s.by_severity.critical > 0 %}<div class="pc-bar" style="width:{{ ((s.by_severity.critical / s.total)*100)|round }}%;background:#ff4d6d"></div>{% endif %}
+        {% if s.by_severity.high > 0 %}<div class="pc-bar" style="width:{{ ((s.by_severity.high / s.total)*100)|round }}%;background:#ff9a3c"></div>{% endif %}
+        {% if s.by_severity.medium > 0 %}<div class="pc-bar" style="width:{{ ((s.by_severity.medium / s.total)*100)|round }}%;background:#ffd166"></div>{% endif %}
+        {% if s.by_severity.low > 0 %}<div class="pc-bar" style="width:{{ ((s.by_severity.low / s.total)*100)|round }}%;background:#6bbcff"></div>{% endif %}
+      </div>
+      {% endif %}
+      <span>{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '—' }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
   {% else %}
-    <div class="card" style="text-align:center;padding:60px;color:var(--muted)">
-      No programs yet. <a href="{{ url_for('programs.add_program') }}" style="color:var(--accent2)">Add your first program →</a>
-    </div>
+  <div class="card" style="text-align:center;padding:60px;color:var(--muted)">
+    No programs yet. <a href="{{ url_for('programs.add_program') }}" style="color:var(--accent2)">Add your first →</a>
+  </div>
   {% endif %}
+
+<div id="no-results" style="display:none;text-align:center;padding:60px;color:var(--muted)">
+  No programs match your search.
 </div>
+</div>
+
+
+{% block extra_scripts %}
+<script>
+  var currentFilter = 'all';
+
+  function setFilter(type, btn) {
+    currentFilter = type;
+    document.querySelectorAll('.fopt').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const q      = document.getElementById('prog-search').value.toLowerCase().trim();
+    const sort   = document.getElementById('prog-sort').value;
+    const grid   = document.getElementById('programs-grid');
+    const cards  = [...grid.querySelectorAll('.program-card')];
+
+    // filter
+    let visible = 0;
+    cards.forEach(c => {
+      const matchQ = !q || c.dataset.name.includes(q);
+      const matchF =
+        currentFilter === 'all' ||
+        (currentFilter === 'active'   && c.dataset.active === 'true') ||
+        (currentFilter === 'inactive' && c.dataset.active === 'false');
+      const show = matchQ && matchF;
+      c.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    document.getElementById('no-results').style.display = visible === 0 ? 'block' : 'none';
+
+    // sort
+    const sorted = cards.filter(c => c.style.display !== 'none').sort((a, b) => {
+      switch (sort) {
+        case 'name':     return a.dataset.name.localeCompare(b.dataset.name);
+        case 'findings': return b.dataset.findings - a.dataset.findings;
+        case 'critical': return b.dataset.critical - a.dataset.critical;
+        case 'rewarded': return b.dataset.rewarded - a.dataset.rewarded;
+        case 'newest':   return b.dataset.created  - a.dataset.created;
+        case 'oldest':   return a.dataset.created  - b.dataset.created;
+        default: return 0;
+      }
+    });
+    sorted.forEach(c => grid.appendChild(c));
+  }
+</script>
+{% endblock %}
 {% endblock %}
