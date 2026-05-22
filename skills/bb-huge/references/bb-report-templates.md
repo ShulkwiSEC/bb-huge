@@ -8,6 +8,24 @@ Copy, fill in the blanks, and submit.
 
 ---
 
+## Report Preparation Checklist
+
+Before using any template below, run this prep workflow:
+
+1. **`bb_generate_report_context(finding_id)`** — pull the report-ready pack:
+   normalized summary, linked hypothesis data, evidence records, attachments,
+   notes, and unresolved gaps (missing CWE, CVSS, PoC, evidence).
+2. **Fill the gaps** — use `bb_update_finding()` to add any missing fields
+   identified by the report context.
+3. **Attach remaining evidence** — use `bb_upload_attachment()` for screenshots
+   or recordings, `bb_attach_http_pair()` for HTTP evidence.
+4. **Select the matching template** below by vulnerability type.
+5. Fill the template from the report context data.
+6. **Self-review**: is impact clear? are steps reproducible? is every claim
+   backed by evidence?
+
+---
+
 ## Report Writing Principles
 
 1. **Lead with impact** — the first sentence should tell the triage team what an attacker can do, not what the vulnerability is

@@ -128,23 +128,46 @@ For each auth endpoint, note:
 
 ## Recon Output → bb-huge
 
-Create one finding per major recon category:
+Recon data has two homes in bb-huge, depending on maturity:
+
+### A. Structured Recon Entries (use `bb_add_recon`)
+
+For individual assets discovered during recon, add them directly to the program:
+
+```bash
+bb_add_recon(program_id=1, category="subdomain", value="admin.example.com", source="subfinder")
+bb_add_recon(program_id=1, category="endpoint", value="https://api.example.com/v2/users", source="waybackurls")
+bb_add_recon(program_id=1, category="technology", value="React 18", source="whatweb")
+```
+
+This keeps recon data organized, searchable, and separate from findings.
+
+### B. One Observation Per Major Recon Phase (optional)
+
+For a narrative summary of what was discovered, use an observation (not a
+finding — recon is informational, not a vulnerability):
 
 ```json
-{
-  "title": "Recon: <target> — Attack Surface Map",
-  "target": "<target>",
-  "severity": "informational",
-  "status": "debugging",
-  "agent": "<your-agent>",
-  "description": "## Subdomains Found\n<list>\n\n## Live Hosts\n<list>\n\n## Technologies\n<list>\n\n## Interesting Endpoints\n<list>\n\n## Auth Surface\n<list>"
-}
+bb_log_observation({
+  "program_id": 1,
+  "title": "Recon: example.com — Attack Surface Summary",
+  "summary": "## Subdomains Found\n<list>\n\n## Live Hosts\n<list>\n\n## Technologies\n<list>\n\n## Interesting Endpoints\n<list>\n\n## Auth Surface\n<list>",
+  "category": "recon",
+  "confidence": "high",
+  "agent": "<your-agent>"
+})
 ```
 
-Attach recon files:
+Attach recon files to the observation:
 ```
-bb_upload_attachment: subs.txt, live_hosts.txt, params.txt, js_files.txt
+bb_upload_attachment(id=<observation_id>, file_path="./subs.txt")
 ```
+
+**Why use observations instead of findings for recon?**
+- Recon is not a vulnerability — using a finding pollutes the findings list
+- Observations can be closed (→ `closed`) when the target is done
+- The program brief (`bb_get_program_brief`) shows open observations,
+  keeping recon visible without cluttering main findings
 
 ---
 

@@ -51,6 +51,12 @@ Priority order:
 3. Input handling (XSS, SQLi, SSRF, SSTI)
 4. Business logic (requires app understanding)
 5. Information disclosure (sweep at the end)
+
+During testing:
+- Weak or partial signal → bb_log_observation() (cheap, easy to close)
+- Stronger candidate with a testable theory → bb_log_hypothesis()
+- Attach evidence with bb_attach_http_pair() at every stage
+- Promote when confident: observation → hypothesis → finding
 ```
 
 ### Phase 3 — Confirmation
@@ -148,10 +154,16 @@ Signal:  Executes in another session (use two accounts)
 
 The bb-huge portal is your persistent memory. Use it aggressively:
 
-- Every hypothesis → create a finding with `status: debugging`
-- Every dead end → update the finding with a note, set `status: n/a`
+- Every weak signal → `bb_log_observation()` (low confidence, easy to close if wrong)
+- Every stronger candidate → `bb_log_hypothesis()` (testable theory with attack path)
+- Every confirmed issue → `bb_create_finding()` (mature record)
+- Every dead end → add a note explaining why, close the observation/hypothesis
 - Every partial finding → update description with "Progress as of [date]: ..."
-- Session start → always run `bb_get_stats` + `bb_list_findings` first
+- Every HTTP exchange worth saving → `bb_attach_http_pair()`
+- Session start → always run `bb_get_stats` + `bb_get_program_brief(id)` first
+
+Promote records as confidence grows:
+`bb_promote_observation()` → hypothesis → `bb_promote_hypothesis()` → finding.
 
 This ensures a new session (or a new agent) can pick up exactly where you left off.
 

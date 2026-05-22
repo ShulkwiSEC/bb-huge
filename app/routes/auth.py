@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
+from urllib.parse import urlparse
+
+from flask import Blueprint, render_template, request, redirect, url_for, session, current_app
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -24,7 +26,7 @@ def login():
         if key == current_app.config["DEV_KEY"]:
             session.permanent = True
             session["authenticated"] = True
-            next_url = request.args.get("next") or url_for("findings.dashboard")
+            next_url = _safe_next_url(request.args.get("next")) or url_for("findings.dashboard")
             return redirect(next_url)
         error = "Invalid key. Try again."
 
@@ -35,3 +37,14 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("auth.login"))
+
+
+def _safe_next_url(next_url):
+    if not next_url:
+        return None
+    parsed = urlparse(next_url)
+    if parsed.scheme or parsed.netloc:
+        return None
+    if not next_url.startswith("/"):
+        return None
+    return next_url

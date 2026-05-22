@@ -18,6 +18,11 @@ class Config:
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "pdf", "txt", "md", "xml", "json", "html", "zip"}
 
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
+    SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "bb_huge_session")
+    PREFERRED_URL_SCHEME = "https" if SESSION_COOKIE_SECURE else "http"
 
     # MCP server settings
     MCP_HOST = os.environ.get("MCP_HOST", "127.0.0.1")

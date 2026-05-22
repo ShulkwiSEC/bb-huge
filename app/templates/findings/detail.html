@@ -11,7 +11,6 @@
   .detail-header-main { flex: 1; min-width: 0; }
   .detail-title { font-size: 22px; font-weight: 600; line-height: 1.3; margin-bottom: 10px; }
   .meta-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-
   .meta-pill {
     display: flex; align-items: center; gap: 5px;
     background: var(--bg3);
@@ -25,12 +24,13 @@
   .meta-pill.mono strong { font-family: var(--mono); }
   .meta-pill.program-pill { border-color: rgba(138,122,255,0.25); background: rgba(138,122,255,0.08); }
 
-  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow:auto; }
   .tab-btn {
     padding: 10px 18px; font-size: 13px; font-weight: 500;
     background: none; border: none; color: var(--muted);
     cursor: pointer; border-bottom: 2px solid transparent;
     margin-bottom: -1px; transition: all .15s; font-family: var(--sans);
+    white-space: nowrap;
   }
   .tab-btn:hover { color: var(--text); }
   .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
@@ -39,29 +39,19 @@
 
   .status-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .status-form select { width: auto; padding: 7px 10px; font-size: 13px; }
-
-  .attachment-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 10px; margin-top: 12px;
+  .attachment-grid, .evidence-grid, .related-grid, .gap-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 12px;
   }
-  .attachment-card {
+  .attachment-card, .evidence-card, .related-card, .gap-card, .summary-card {
     background: var(--bg3);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 12px 14px;
-    display: flex; align-items: center; gap: 10px;
-    transition: border-color 0.2s;
   }
-  .attachment-card:hover { border-color: var(--border2); }
+  .attachment-card:hover, .evidence-card:hover, .related-card:hover { border-color: var(--border2); }
   .attachment-icon { font-size: 20px; flex-shrink: 0; }
-  .attachment-name {
-    font-size: 12px; color: var(--text);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    flex: 1;
-  }
-  .attachment-name a { color: var(--accent2); text-decoration: none; }
-
+  .attachment-name { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .attachment-name a, .related-card a { color: var(--accent2); text-decoration: none; }
   .danger-zone {
     border: 1px solid rgba(255,77,109,.2);
     border-radius: 10px;
@@ -69,13 +59,7 @@
     margin-top: 24px;
   }
   .danger-zone h3 { font-size: 13px; color: var(--critical); margin-bottom: 10px; }
-
-  .cvss-big {
-    font-family: var(--mono);
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1;
-  }
+  .cvss-big { font-family: var(--mono); font-size: 32px; font-weight: 700; line-height: 1; }
   .info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -90,46 +74,37 @@
   }
   .info-box .ib-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; font-weight: 600; margin-bottom: 6px; }
   .info-box .ib-value { font-size: 13px; font-weight: 500; }
-
   .note-timeline { position: relative; padding-left: 24px; }
   .note-timeline::before {
-    content: '';
-    position: absolute;
-    left: 7px;
-    top: 8px;
-    bottom: 8px;
-    width: 2px;
-    background: var(--border);
-    border-radius: 2px;
+    content: ''; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--border); border-radius: 2px;
   }
   .note-entry {
-    position: relative;
-    margin-bottom: 16px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
+    position: relative; margin-bottom: 16px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
   }
   .note-entry::before {
-    content: '';
-    position: absolute;
-    left: -20px;
-    top: 16px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid var(--bg);
+    content: ''; position: absolute; left: -20px; top: 16px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg);
   }
-
-  #program-switch { width: auto; min-width: 180px; padding: 6px 10px; font-size: 12px; }
+  .stack { display:grid; gap:12px; }
+  .tiny { font-size:11px; color:var(--muted); }
+  .mono-tiny { font-size:11px; color:var(--muted); font-family:var(--mono); }
+  .report-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:900px){ .report-grid { grid-template-columns:1fr; } }
+  .report-box, .hyp-box {
+    background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:14px 16px;
+  }
+  .section-label {
+    font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px;
+  }
+  pre.code-block {
+    white-space:pre-wrap; overflow-wrap:anywhere; margin-top:10px;
+    background:rgba(0,0,0,.18); border:1px solid var(--border); border-radius:8px; padding:12px;
+  }
+  #program-switch { width: auto; padding: 6px 10px; font-size: 12px; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
-
-  <!-- Header -->
   <div class="detail-header">
     <div class="detail-header-main">
       <a href="{{ url_for('findings.list_findings') }}" class="text-muted" style="font-size:13px;text-decoration:none">← Findings</a>
@@ -141,8 +116,9 @@
         <span class="meta-pill mono"><strong>{{ finding.agent }}</strong></span>
         <span class="meta-pill"><strong>{{ finding.target }}</strong></span>
         <span class="meta-pill">{{ finding.platform }}</span>
-        {% if finding.cwe %}
-        <span class="meta-pill mono"><strong>{{ finding.cwe }}</strong></span>
+        {% if finding.cwe %}<span class="meta-pill mono"><strong>{{ finding.cwe }}</strong></span>{% endif %}
+        {% if finding.hypothesis %}
+          <span class="meta-pill">🔗 <strong>hypothesis #{{ finding.hypothesis.id }}</strong></span>
         {% endif %}
         {% if finding.program %}
         <span class="meta-pill program-pill">
@@ -156,7 +132,6 @@
     </div>
   </div>
 
-  <!-- Info row -->
   <div class="info-grid">
     {% if finding.cvss %}
     <div class="info-box">
@@ -175,22 +150,25 @@
     </div>
     {% endif %}
     <div class="info-box">
-      <div class="ib-label">Created</div>
-      <div class="ib-value mono" style="font-size:12px">
-        {{ finding.created_at.strftime('%Y-%m-%d %H:%M') if finding.created_at else '—' }}
-      </div>
+      <div class="ib-label">Confidence</div>
+      <div class="ib-value">{{ finding.confidence }}</div>
     </div>
     <div class="info-box">
-      <div class="ib-label">Last Updated</div>
-      <div class="ib-value mono" style="font-size:12px">
-        {{ finding.updated_at.strftime('%Y-%m-%d %H:%M') if finding.updated_at else '—' }}
-      </div>
+      <div class="ib-label">Structured Evidence</div>
+      <div class="ib-value">{{ finding.evidence_records|length }}</div>
     </div>
     <div class="info-box">
       <div class="ib-label">Attachments</div>
       <div class="ib-value">{{ finding.attachments|length }}</div>
     </div>
-    <!-- Program linking -->
+    <div class="info-box">
+      <div class="ib-label">Created</div>
+      <div class="ib-value mono" style="font-size:12px">{{ finding.created_at.strftime('%Y-%m-%d %H:%M') if finding.created_at else '—' }}</div>
+    </div>
+    <div class="info-box">
+      <div class="ib-label">Last Updated</div>
+      <div class="ib-value mono" style="font-size:12px">{{ finding.updated_at.strftime('%Y-%m-%d %H:%M') if finding.updated_at else '—' }}</div>
+    </div>
     <div class="info-box">
       <div class="ib-label">Program</div>
       <div class="ib-value">
@@ -211,7 +189,6 @@
     </div>
   </div>
 
-  <!-- Quick status update -->
   <div class="card" style="margin-bottom:20px">
     <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Update Status</div>
     <form method="POST" action="{{ url_for('findings.update_status', fid=finding.id) }}" class="status-form">
@@ -224,22 +201,19 @@
     </form>
   </div>
 
-  <!-- Tabs -->
   <div class="card">
     <div class="tabs">
       <button class="tab-btn active" onclick="showTab('description', this)">Description</button>
       <button class="tab-btn" onclick="showTab('poc', this)">PoC / Steps</button>
-      <button class="tab-btn" onclick="showTab('attachments', this)">
-        Attachments
-        {% if finding.attachments %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ finding.attachments|length }}</span>{% endif %}
-      </button>
-      <button class="tab-btn" onclick="showTab('notes', this)" id="notes-tab-btn">
-        Notes
-        {% if finding.notes %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ finding.notes|length }}</span>{% endif %}
-      </button>
+      <button class="tab-btn" onclick="showTab('hypothesis', this)">Linked Hypothesis</button>
+      {% set evidence_total = (finding.evidence_records|length) + (report_pack.hypothesis_evidence|length) %}
+      <button class="tab-btn" onclick="showTab('evidence', this)" id="evidence-tab-btn">Evidence{% if evidence_total %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ evidence_total }}</span>{% endif %}</button>
+      <button class="tab-btn" onclick="showTab('report', this)" id="report-tab-btn">Report Pack</button>
+      <button class="tab-btn" onclick="showTab('attachments', this)">Attachments{% if finding.attachments %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ finding.attachments|length }}</span>{% endif %}</button>
+      <button class="tab-btn" onclick="showTab('related', this)">Related Work</button>
+      <button class="tab-btn" onclick="showTab('notes', this)" id="notes-tab-btn">Notes{% if finding.notes %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ finding.notes|length }}</span>{% endif %}</button>
     </div>
 
-    <!-- Description -->
     <div id="tab-description" class="tab-panel active">
       {% if finding.description %}
         <div class="md-body" id="md-description">{{ finding.description }}</div>
@@ -248,7 +222,6 @@
       {% endif %}
     </div>
 
-    <!-- PoC -->
     <div id="tab-poc" class="tab-panel">
       {% if finding.poc %}
         <div class="md-body" id="md-poc">{{ finding.poc }}</div>
@@ -257,32 +230,155 @@
       {% endif %}
     </div>
 
-    <!-- Attachments -->
+    <div id="tab-hypothesis" class="tab-panel">
+      {% if report_pack.linked_hypothesis %}
+        <div class="hyp-box">
+          <div class="section-label">Summary</div>
+          <div style="font-weight:600;font-size:16px">{{ report_pack.linked_hypothesis.title }}</div>
+          <div class="meta-row" style="margin-top:8px">
+            {% if report_pack.linked_hypothesis.weakness_hint %}<span class="meta-pill">{{ report_pack.linked_hypothesis.weakness_hint }}</span>{% endif %}
+            {% if report_pack.linked_hypothesis.cwe %}<span class="meta-pill mono"><strong>{{ report_pack.linked_hypothesis.cwe }}</strong></span>{% endif %}
+            {% if report_pack.linked_hypothesis.severity_hint %}<span class="badge badge-{{ report_pack.linked_hypothesis.severity_hint }}">{{ report_pack.linked_hypothesis.severity_hint }}</span>{% endif %}
+            <span class="meta-pill">{{ report_pack.linked_hypothesis.confidence }}</span>
+            <span class="meta-pill">{{ report_pack.linked_hypothesis.status }}</span>
+          </div>
+          {% if report_pack.linked_hypothesis.attack_path %}
+            <div class="section-label" style="margin-top:14px">Attack Path</div>
+            <div class="md-body hyp-md">{{ report_pack.linked_hypothesis.attack_path }}</div>
+          {% endif %}
+          {% if report_pack.linked_hypothesis.impact_hypothesis %}
+            <div class="section-label" style="margin-top:14px">Impact Hypothesis</div>
+            <div class="md-body hyp-md">{{ report_pack.linked_hypothesis.impact_hypothesis }}</div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="text-muted">This finding is not linked to a hypothesis.</div>
+      {% endif %}
+    </div>
+
+    <div id="tab-evidence" class="tab-panel">
+      {% if finding.evidence_records or report_pack.hypothesis_evidence %}
+        <div class="stack">
+          {% if finding.evidence_records %}
+            <div>
+              <div class="section-label">Finding Evidence</div>
+              <div class="evidence-grid">
+                {% for evidence in finding.evidence_records %}
+                  <div class="evidence-card">
+                    <div style="font-weight:600">{{ evidence.title }}</div>
+                    <div class="meta-row" style="margin-top:8px">
+                      <span class="meta-pill">{{ evidence.evidence_type }}</span>
+                      {% if evidence.request_method %}<span class="meta-pill mono"><strong>{{ evidence.request_method }}</strong></span>{% endif %}
+                      {% if evidence.response_status %}<span class="meta-pill">HTTP {{ evidence.response_status }}</span>{% endif %}
+                    </div>
+                    {% if evidence.summary %}<div class="tiny" style="margin-top:8px">{{ evidence.summary }}</div>{% endif %}
+                    {% if evidence.request_url %}<div class="mono-tiny" style="margin-top:8px">{{ evidence.request_url }}</div>{% endif %}
+                    {% if evidence.request_body_text %}<pre class="code-block">{{ evidence.request_body_text }}</pre>{% endif %}
+                    {% if evidence.response_body_text %}<pre class="code-block">{{ evidence.response_body_text }}</pre>{% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+          {% if report_pack.hypothesis_evidence %}
+            <div>
+              <div class="section-label">Linked Hypothesis Evidence</div>
+              <div class="evidence-grid">
+                {% for evidence in report_pack.hypothesis_evidence %}
+                  <div class="evidence-card">
+                    <div style="font-weight:600">{{ evidence.title }}</div>
+                    <div class="meta-row" style="margin-top:8px">
+                      <span class="meta-pill">{{ evidence.evidence_type }}</span>
+                      {% if evidence.request_method %}<span class="meta-pill mono"><strong>{{ evidence.request_method }}</strong></span>{% endif %}
+                      {% if evidence.response_status %}<span class="meta-pill">HTTP {{ evidence.response_status }}</span>{% endif %}
+                    </div>
+                    {% if evidence.summary %}<div class="tiny" style="margin-top:8px">{{ evidence.summary }}</div>{% endif %}
+                    {% if evidence.request_url %}<div class="mono-tiny" style="margin-top:8px">{{ evidence.request_url }}</div>{% endif %}
+                    {% if evidence.request_body_text %}<pre class="code-block">{{ evidence.request_body_text }}</pre>{% endif %}
+                    {% if evidence.response_body_text %}<pre class="code-block">{{ evidence.response_body_text }}</pre>{% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="text-muted">No structured evidence records yet.</div>
+      {% endif %}
+    </div>
+
+    <div id="tab-report" class="tab-panel">
+      <div class="report-grid">
+        <div class="stack">
+          <div class="report-box">
+            <div class="section-label">Report Summary</div>
+            <div class="summary-card">
+              <div><strong>Title:</strong> {{ finding.title }}</div>
+              <div class="tiny" style="margin-top:6px"><strong>Target:</strong> {{ finding.target }}</div>
+              <div class="tiny" style="margin-top:6px"><strong>Severity:</strong> {{ finding.severity }}</div>
+              <div class="tiny" style="margin-top:6px"><strong>Confidence:</strong> {{ finding.confidence }}</div>
+              {% if finding.cwe or report_pack.linked_hypothesis %}
+                <div class="tiny" style="margin-top:6px"><strong>CWE:</strong> {{ finding.cwe or report_pack.linked_hypothesis.cwe }}</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="report-box">
+            <div class="section-label">Attack / Impact</div>
+            {% if report_pack.linked_hypothesis and report_pack.linked_hypothesis.attack_path %}
+              <div class="md-body hyp-md">{{ report_pack.linked_hypothesis.attack_path }}</div>
+            {% else %}
+              <div class="tiny">No linked attack path.</div>
+            {% endif %}
+            {% if report_pack.linked_hypothesis and report_pack.linked_hypothesis.impact_hypothesis %}
+              <div class="section-label" style="margin-top:14px">Impact</div>
+              <div class="md-body hyp-md">{{ report_pack.linked_hypothesis.impact_hypothesis }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="stack">
+          <div class="report-box">
+            <div class="section-label">Unresolved Gaps</div>
+            {% if report_pack.unresolved_gaps %}
+              <div class="gap-grid">
+                {% for gap in report_pack.unresolved_gaps %}
+                  <div class="gap-card">{{ gap }}</div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="tiny">No obvious report-prep gaps detected.</div>
+            {% endif %}
+          </div>
+          <div class="report-box">
+            <div class="section-label">Evidence Inventory</div>
+            <div class="tiny">Finding evidence: {{ report_pack.finding_evidence|length }}</div>
+            <div class="tiny" style="margin-top:6px">Hypothesis evidence: {{ report_pack.hypothesis_evidence|length }}</div>
+            <div class="tiny" style="margin-top:6px">Attachments: {{ finding.attachments|length }}</div>
+            <div class="tiny" style="margin-top:6px">Notes: {{ finding.notes|length }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="tab-attachments" class="tab-panel">
       {% if finding.attachments %}
         <div class="attachment-grid">
           {% for att in finding.attachments %}
           <div class="attachment-card">
-            <span class="attachment-icon">
-              {% set ext = att.original_name.rsplit('.',1)[-1].lower() %}
-              {% if ext in ['png','jpg','jpeg','gif','webp'] %}🖼️
-              {% elif ext == 'pdf' %}📄
-              {% elif ext in ['txt','md'] %}📝
-              {% else %}📎{% endif %}
-            </span>
-            <div style="flex:1;min-width:0">
-              <div class="attachment-name">
-                <a href="{{ url_for('findings.uploaded_file', filename=att.filename) }}" target="_blank">
-                  {{ att.original_name }}
-                </a>
-              </div>
-              <div style="font-size:11px;color:var(--muted)">
-                {{ att.uploaded_at.strftime('%Y-%m-%d') if att.uploaded_at else '' }}
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="attachment-icon">
+                {% set ext = att.original_name.rsplit('.',1)[-1].lower() %}
+                {% if ext in ['png','jpg','jpeg','gif','webp'] %}🖼️
+                {% elif ext == 'pdf' %}📄
+                {% elif ext in ['txt','md'] %}📝
+                {% else %}📎{% endif %}
+              </span>
+              <div style="flex:1;min-width:0">
+                <div class="attachment-name"><a href="{{ url_for('findings.uploaded_file', filename=att.filename) }}" target="_blank">{{ att.original_name }}</a></div>
+                <div class="tiny">{{ att.uploaded_at.strftime('%Y-%m-%d') if att.uploaded_at else '' }}</div>
               </div>
             </div>
-            <form method="POST" action="{{ url_for('findings.delete_attachment', aid=att.id) }}"
-                  onsubmit="return confirm('Delete attachment?')">
-              <button type="submit" class="btn btn-danger btn-sm" title="Delete">✕</button>
+            <form method="POST" action="{{ url_for('findings.delete_attachment', aid=att.id) }}" onsubmit="return confirm('Delete attachment?')" style="margin-top:10px">
+              <button type="submit" class="btn btn-danger btn-sm" title="Delete">Delete</button>
             </form>
           </div>
           {% endfor %}
@@ -292,7 +388,50 @@
       {% endif %}
     </div>
 
-    <!-- Notes / Activity log -->
+    <div id="tab-related" class="tab-panel">
+      <div class="stack">
+        <div>
+          <div class="section-label">Related Findings</div>
+          {% if related_work.findings %}
+            <div class="related-grid">
+              {% for related in related_work.findings %}
+                <div class="related-card">
+                  <a href="{{ url_for('findings.detail', fid=related.id) }}">{{ related.title }}</a>
+                  <div class="meta-row" style="margin-top:8px">
+                    <span class="badge badge-{{ related.severity }}">{{ related.severity }}</span>
+                    {% set rsc = related.status.replace('/','').replace('-','') %}
+                    <span class="badge badge-{{ rsc }}">{{ related.status }}</span>
+                  </div>
+                  <div class="tiny" style="margin-top:8px">{{ related.target }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="tiny">No related findings found.</div>
+          {% endif %}
+        </div>
+        <div>
+          <div class="section-label">Related Hypotheses</div>
+          {% if related_work.hypotheses %}
+            <div class="related-grid">
+              {% for related in related_work.hypotheses %}
+                <div class="related-card">
+                  <div style="font-weight:600">{{ related.title }}</div>
+                  <div class="meta-row" style="margin-top:8px">
+                    {% if related.cwe %}<span class="meta-pill mono"><strong>{{ related.cwe }}</strong></span>{% endif %}
+                    {% if related.severity_hint %}<span class="badge badge-{{ related.severity_hint }}">{{ related.severity_hint }}</span>{% endif %}
+                    <span class="meta-pill">{{ related.status }}</span>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="tiny">No related hypotheses found.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
     <div id="tab-notes" class="tab-panel">
       {% if finding.notes %}
         <div class="note-timeline">
@@ -301,11 +440,8 @@
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
               <span style="font-size:11px;font-family:var(--mono);color:var(--accent2)">{{ note.agent }}</span>
               <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:11px;color:var(--muted)">
-                  {{ note.created_at.strftime('%Y-%m-%d %H:%M') if note.created_at }}
-                </span>
-                <form method="POST" action="{{ url_for('settings.delete_note', nid=note.id) }}"
-                      onsubmit="return confirm('Delete note?')" style="display:inline">
+                <span style="font-size:11px;color:var(--muted)">{{ note.created_at.strftime('%Y-%m-%d %H:%M') if note.created_at }}</span>
+                <form method="POST" action="{{ url_for('settings.delete_note', nid=note.id) }}" onsubmit="return confirm('Delete note?')" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 7px">✕</button>
                 </form>
               </div>
@@ -318,11 +454,8 @@
         <div class="text-muted" style="margin-bottom:16px">No notes yet.</div>
       {% endif %}
 
-      <!-- Add note form -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:16px">
-        <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">
-          + Add Note
-        </div>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">+ Add Note</div>
         <form method="POST" action="{{ url_for('settings.add_note', fid=finding.id) }}">
           <div class="form-group">
             <textarea name="content" rows="3" placeholder="Markdown supported…" style="resize:vertical"></textarea>
@@ -340,7 +473,6 @@
     </div>
   </div>
 
-  <!-- Danger zone -->
   <div class="danger-zone">
     <h3>⚠ Danger Zone</h3>
     <form method="POST" action="{{ url_for('findings.delete_finding', fid=finding.id) }}"
@@ -348,21 +480,21 @@
       <button type="submit" class="btn btn-danger btn-sm">Delete Finding</button>
     </form>
   </div>
-
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
   marked.setOptions({ breaks: true, gfm: true });
   ['md-description', 'md-poc'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = marked.parse(el.textContent);
+    if (el) el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
   });
-  document.querySelectorAll('.note-md').forEach(el => {
-    el.innerHTML = marked.parse(el.textContent);
+  document.querySelectorAll('.note-md, .hyp-md').forEach(el => {
+    el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
   });
   document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
 
@@ -373,8 +505,14 @@
     btn.classList.add('active');
   }
 
-  if (window.location.hash === '#notes') {
-    document.getElementById('notes-tab-btn').click();
+  const hashToTab = {
+    '#notes': 'notes-tab-btn',
+    '#evidence': 'evidence-tab-btn',
+    '#report': 'report-tab-btn'
+  };
+  const btnId = hashToTab[window.location.hash];
+  if (btnId) {
+    document.getElementById(btnId)?.click();
   }
 </script>
 {% endblock %}

@@ -11,10 +11,21 @@ from flask import (
     current_app,
     send_from_directory,
     abort,
+    jsonify,
 )
 from werkzeug.utils import secure_filename
 from .. import db
-from ..models import Finding, Attachment, Program, SEVERITIES, STATUSES, AGENTS
+from ..models import (
+    Finding,
+    Attachment,
+    Program,
+    EvidenceRecord,
+    Hypothesis,
+    Observation,
+    SEVERITIES,
+    STATUSES,
+    AGENTS,
+)
 from .auth import login_required
 from ..utils import allowed_file
 
@@ -183,8 +194,15 @@ def list_findings():
 def detail(fid):
     finding = Finding.query.get_or_404(fid)
     programs = Program.query.order_by(Program.name).all()
+    report_pack = _build_report_pack(finding)
+    related_work = _related_work(finding)
     return render_template(
-        "findings/detail.html", finding=finding, statuses=STATUSES, programs=programs
+        "findings/detail.html",
+        finding=finding,
+        statuses=STATUSES,
+        programs=programs,
+        report_pack=report_pack,
+        related_work=related_work,
     )
 
 
@@ -221,7 +239,7 @@ def add_finding():
     program = None
     pid = request.args.get("program_id", type=int)
     if pid:
-        program = Program.query.get(pid)
+        program = db.session.get(Program, pid)
     return render_template(
         "findings/form.html",
         finding=None,
@@ -230,6 +248,102 @@ def add_finding():
         statuses=STATUSES,
         agents=AGENTS,
     )
+
+
+@findings_bp.route("/findings/check-existing")
+@login_required
+def check_existing():
+    title = request.args.get("title", "").strip()
+    target = request.args.get("target", "").strip()
+    cwe = request.args.get("cwe", "").strip()
+    description = request.args.get("description", "").strip()
+    program_id = request.args.get("program_id", type=int)
+
+    if not any([title, target, cwe, description]):
+        return jsonify({"error": "Provide title, target, cwe, or description"}), 400
+
+    query = {"title": title, "target": target, "cwe": cwe, "description": description}
+    results = []
+
+    finding_query = Finding.query
+    hypothesis_query = Hypothesis.query
+    observation_query = Observation.query
+    if program_id:
+        finding_query = finding_query.filter_by(program_id=program_id)
+        hypothesis_query = hypothesis_query.filter_by(program_id=program_id)
+        observation_query = observation_query.filter_by(program_id=program_id)
+
+    for finding in finding_query.order_by(Finding.updated_at.desc()).limit(80).all():
+        score, reasons = _similarity_score(
+            {
+                "title": finding.title,
+                "target": finding.target,
+                "cwe": finding.cwe,
+                "description": finding.description,
+            },
+            query,
+        )
+        if score >= 20:
+            results.append(
+                {
+                    "kind": "finding",
+                    "id": finding.id,
+                    "title": finding.title,
+                    "target": finding.target,
+                    "status": finding.status,
+                    "score": score,
+                    "reasons": reasons,
+                }
+            )
+
+    for hypothesis in hypothesis_query.order_by(Hypothesis.updated_at.desc()).limit(80).all():
+        score, reasons = _similarity_score(
+            {
+                "title": hypothesis.title,
+                "target": hypothesis.program.name if hypothesis.program else "",
+                "cwe": hypothesis.cwe,
+                "description": hypothesis.attack_path or hypothesis.impact_hypothesis,
+            },
+            query,
+        )
+        if score >= 20:
+            results.append(
+                {
+                    "kind": "hypothesis",
+                    "id": hypothesis.id,
+                    "title": hypothesis.title,
+                    "target": hypothesis.program.name if hypothesis.program else "",
+                    "status": hypothesis.status,
+                    "score": score,
+                    "reasons": reasons,
+                }
+            )
+
+    for observation in observation_query.order_by(Observation.updated_at.desc()).limit(80).all():
+        score, reasons = _similarity_score(
+            {
+                "title": observation.title,
+                "target": observation.program.name if observation.program else "",
+                "cwe": "",
+                "description": observation.summary,
+            },
+            query,
+        )
+        if score >= 20:
+            results.append(
+                {
+                    "kind": "observation",
+                    "id": observation.id,
+                    "title": observation.title,
+                    "target": observation.program.name if observation.program else "",
+                    "status": observation.status,
+                    "score": score,
+                    "reasons": reasons,
+                }
+            )
+
+    results.sort(key=lambda item: item["score"], reverse=True)
+    return jsonify({"matches": results[:12]})
 
 
 # ── Edit ──────────────────────────────────────────────────────────────────────
@@ -350,6 +464,119 @@ def _parse_float(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _build_report_pack(finding):
+    linked_hypothesis = finding.hypothesis
+    related_evidence = list(finding.evidence_records)
+    if linked_hypothesis:
+        hypothesis_evidence = [
+            evidence
+            for evidence in linked_hypothesis.evidence_records
+            if evidence.finding_id is None
+        ]
+    else:
+        hypothesis_evidence = []
+
+    unresolved_gaps = []
+    if not finding.cwe and not (linked_hypothesis and linked_hypothesis.cwe):
+        unresolved_gaps.append("Missing CWE classification")
+    if not finding.cvss:
+        unresolved_gaps.append("Missing CVSS score")
+    if not finding.poc.strip():
+        unresolved_gaps.append("PoC / reproduction steps are incomplete")
+    if not related_evidence and not hypothesis_evidence:
+        unresolved_gaps.append("No structured evidence records attached")
+
+    return {
+        "linked_hypothesis": linked_hypothesis,
+        "finding_evidence": related_evidence,
+        "hypothesis_evidence": hypothesis_evidence,
+        "unresolved_gaps": unresolved_gaps,
+    }
+
+
+def _tokenize(value):
+    if not value:
+        return set()
+    tokens = []
+    current = []
+    for char in value.lower():
+        if char.isalnum():
+            current.append(char)
+        elif current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return {token for token in tokens if len(token) >= 3}
+
+
+def _similarity_score(candidate, query):
+    score = 0
+    reasons = []
+
+    title_tokens = _tokenize(query.get("title"))
+    candidate_title_tokens = _tokenize(candidate.get("title"))
+    if title_tokens and candidate_title_tokens:
+        overlap = len(title_tokens & candidate_title_tokens)
+        if overlap:
+            score += min(overlap * 12, 36)
+            reasons.append(f"title overlap={overlap}")
+
+    query_cwe = (query.get("cwe") or "").strip().lower()
+    candidate_cwe = (candidate.get("cwe") or "").strip().lower()
+    if query_cwe and candidate_cwe and query_cwe == candidate_cwe:
+        score += 35
+        reasons.append("same cwe")
+
+    query_target = (query.get("target") or "").strip().lower()
+    candidate_target = (candidate.get("target") or "").strip().lower()
+    if query_target and candidate_target:
+        if query_target == candidate_target:
+            score += 30
+            reasons.append("same target")
+        elif query_target in candidate_target or candidate_target in query_target:
+            score += 18
+            reasons.append("target partial match")
+
+    desc_tokens = _tokenize(query.get("description"))
+    candidate_desc_tokens = _tokenize(candidate.get("description"))
+    if desc_tokens and candidate_desc_tokens:
+        overlap = len(desc_tokens & candidate_desc_tokens)
+        if overlap:
+            score += min(overlap * 5, 20)
+            reasons.append(f"description overlap={overlap}")
+
+    return score, reasons
+
+
+def _related_work(finding):
+    related_findings = []
+    related_hypotheses = []
+    query = Finding.query
+    if finding.program_id:
+        query = query.filter_by(program_id=finding.program_id)
+    if finding.cwe:
+        query = query.filter(Finding.id != finding.id, Finding.cwe == finding.cwe)
+    else:
+        query = query.filter(Finding.id != finding.id, Finding.target == finding.target)
+    related_findings = query.order_by(Finding.updated_at.desc()).limit(5).all()
+
+    if finding.hypothesis_id:
+        hypothesis_query = Hypothesis.query.filter(Hypothesis.id != finding.hypothesis_id)
+    else:
+        hypothesis_query = Hypothesis.query
+    if finding.program_id:
+        hypothesis_query = hypothesis_query.filter_by(program_id=finding.program_id)
+    if finding.cwe:
+        hypothesis_query = hypothesis_query.filter(Hypothesis.cwe == finding.cwe)
+    related_hypotheses = hypothesis_query.order_by(Hypothesis.updated_at.desc()).limit(5).all()
+
+    return {
+        "findings": related_findings,
+        "hypotheses": related_hypotheses,
+    }
 
 
 def _handle_uploads(finding_id):

@@ -1,9 +1,38 @@
 import json
 from datetime import datetime, timezone
 from functools import wraps
-from flask import Blueprint, request, jsonify, current_app
+from urllib.parse import urlparse
+
+from flask import Blueprint, current_app, jsonify, request
+
 from .. import db
-from ..models import Finding, Attachment, SEVERITIES, STATUSES, AGENTS
+from ..models import (
+    AGENTS,
+    ASSET_ENVIRONMENTS,
+    ASSET_KINDS,
+    CONFIDENCE_LEVELS,
+    ENDPOINT_PROTOCOLS,
+    EVIDENCE_TYPES,
+    HYPOTHESIS_STATUSES,
+    OBSERVATION_CATEGORIES,
+    OBSERVATION_STATUSES,
+    PLATFORMS,
+    RECON_CATEGORIES,
+    SEVERITIES,
+    STATUSES,
+    WEBHOOK_EVENTS,
+    Asset,
+    Attachment,
+    Endpoint,
+    EvidenceRecord,
+    Finding,
+    Hypothesis,
+    Note,
+    Observation,
+    Program,
+    ReconEntry,
+    TargetContext,
+)
 from ..utils import allowed_file
 
 api_bp = Blueprint("api", __name__)
@@ -20,14 +49,261 @@ def api_key_required(f):
     return decorated
 
 
-def _parse_float(v):
+def _parse_float(value):
     try:
-        return float(v)
+        return float(value)
     except (TypeError, ValueError):
         return None
 
 
-# ── Stats ─────────────────────────────────────────────────────────────────────
+def _parse_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        normalized = value.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
+    return None
+
+
+def _json_text(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        try:
+            json.loads(value)
+            return value
+        except Exception:
+            return json.dumps({"raw": value})
+    return json.dumps(value)
+
+
+def _limit_arg(default=50, max_limit=200):
+    return min(int(request.args.get("limit", default)), max_limit)
+
+
+def _validate_choice(value, allowed, field_name):
+    if value not in allowed:
+        return jsonify({"error": f"{field_name} must be one of {allowed}"}), 400
+    return None
+
+
+def _finding_summary(finding):
+    return {
+        "id": finding.id,
+        "title": finding.title,
+        "target": finding.target,
+        "severity": finding.severity,
+        "status": finding.status,
+        "agent": finding.agent,
+        "cwe": finding.cwe,
+        "confidence": finding.confidence,
+        "created_at": finding.created_at.isoformat() if finding.created_at else None,
+        "updated_at": finding.updated_at.isoformat() if finding.updated_at else None,
+    }
+
+
+def _observation_summary(observation):
+    return {
+        "id": observation.id,
+        "title": observation.title,
+        "category": observation.category,
+        "status": observation.status,
+        "agent": observation.agent,
+        "confidence": observation.confidence,
+        "source_tool": observation.source_tool,
+        "created_at": observation.created_at.isoformat()
+        if observation.created_at
+        else None,
+        "updated_at": observation.updated_at.isoformat()
+        if observation.updated_at
+        else None,
+    }
+
+
+def _hypothesis_summary(hypothesis):
+    return {
+        "id": hypothesis.id,
+        "title": hypothesis.title,
+        "weakness_hint": hypothesis.weakness_hint,
+        "cwe": hypothesis.cwe,
+        "severity_hint": hypothesis.severity_hint,
+        "status": hypothesis.status,
+        "agent": hypothesis.agent,
+        "confidence": hypothesis.confidence,
+        "created_at": hypothesis.created_at.isoformat()
+        if hypothesis.created_at
+        else None,
+        "updated_at": hypothesis.updated_at.isoformat()
+        if hypothesis.updated_at
+        else None,
+    }
+
+
+def _tokenize(value):
+    if not value:
+        return set()
+    tokens = []
+    current = []
+    for char in value.lower():
+        if char.isalnum():
+            current.append(char)
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return {token for token in tokens if len(token) >= 3}
+
+
+def _derive_target_from_hypothesis(hypothesis):
+    evidence = (
+        EvidenceRecord.query.filter_by(hypothesis_id=hypothesis.id)
+        .order_by(EvidenceRecord.created_at.desc())
+        .first()
+    )
+    if evidence and evidence.request_url:
+        parsed = urlparse(evidence.request_url)
+        if parsed.netloc:
+            return parsed.netloc
+    if hypothesis.observation_id:
+        evidence = (
+            EvidenceRecord.query.filter_by(observation_id=hypothesis.observation_id)
+            .order_by(EvidenceRecord.created_at.desc())
+            .first()
+        )
+        if evidence and evidence.request_url:
+            parsed = urlparse(evidence.request_url)
+            if parsed.netloc:
+                return parsed.netloc
+    return hypothesis.program.name
+
+
+def _build_report_pack(finding):
+    linked_hypothesis = finding.hypothesis
+    related_evidence = finding.evidence_records
+    if linked_hypothesis:
+        hypothesis_evidence = [
+            evidence.to_dict()
+            for evidence in linked_hypothesis.evidence_records
+            if evidence.finding_id is None
+        ]
+    else:
+        hypothesis_evidence = []
+
+    unresolved_gaps = []
+    if not finding.cwe and not (linked_hypothesis and linked_hypothesis.cwe):
+        unresolved_gaps.append("Missing CWE classification")
+    if not finding.cvss:
+        unresolved_gaps.append("Missing CVSS score")
+    if not finding.poc.strip():
+        unresolved_gaps.append("PoC / reproduction steps are incomplete")
+    if not related_evidence and not hypothesis_evidence:
+        unresolved_gaps.append("No structured evidence records attached")
+
+    return {
+        "finding": finding.to_dict(),
+        "program": finding.program.to_dict() if finding.program else None,
+        "linked_hypothesis": linked_hypothesis.to_dict() if linked_hypothesis else None,
+        "summary": {
+            "title": finding.title,
+            "target": finding.target,
+            "severity": finding.severity,
+            "status": finding.status,
+            "confidence": finding.confidence,
+            "cwe": finding.cwe or (linked_hypothesis.cwe if linked_hypothesis else None),
+            "weakness_hint": linked_hypothesis.weakness_hint if linked_hypothesis else None,
+        },
+        "report_inputs": {
+            "description": finding.description,
+            "attack_path": linked_hypothesis.attack_path if linked_hypothesis else "",
+            "impact": linked_hypothesis.impact_hypothesis if linked_hypothesis else "",
+            "repro_steps": finding.poc,
+            "notes": [note.to_dict() for note in finding.notes],
+            "attachments": [attachment.to_dict() for attachment in finding.attachments],
+        },
+        "evidence_summary": {
+            "finding_evidence": [evidence.to_dict() for evidence in related_evidence],
+            "linked_hypothesis_evidence": hypothesis_evidence,
+        },
+        "unresolved_gaps": unresolved_gaps,
+    }
+
+
+def _similarity_score(candidate, query):
+    score = 0
+    reasons = []
+
+    title_tokens = _tokenize(query.get("title"))
+    candidate_title_tokens = _tokenize(candidate.get("title"))
+    if title_tokens and candidate_title_tokens:
+        overlap = len(title_tokens & candidate_title_tokens)
+        if overlap:
+            score += min(overlap * 12, 36)
+            reasons.append(f"title token overlap={overlap}")
+
+    query_cwe = (query.get("cwe") or "").strip().lower()
+    candidate_cwe = (candidate.get("cwe") or "").strip().lower()
+    if query_cwe and candidate_cwe and query_cwe == candidate_cwe:
+        score += 35
+        reasons.append("same cwe")
+
+    query_target = (query.get("target") or "").strip().lower()
+    candidate_target = (candidate.get("target") or candidate.get("program_name") or "").strip().lower()
+    if query_target and candidate_target:
+        if query_target == candidate_target:
+            score += 30
+            reasons.append("same target")
+        elif query_target in candidate_target or candidate_target in query_target:
+            score += 18
+            reasons.append("target partial match")
+
+    query_desc_tokens = _tokenize(query.get("description"))
+    candidate_desc_tokens = _tokenize(candidate.get("description") or candidate.get("summary"))
+    if query_desc_tokens and candidate_desc_tokens:
+        overlap = len(query_desc_tokens & candidate_desc_tokens)
+        if overlap:
+            score += min(overlap * 5, 20)
+            reasons.append(f"description token overlap={overlap}")
+
+    return score, reasons
+
+
+def _top_duplicate_hotspots(program_id):
+    by_cwe = (
+        db.session.query(Finding.cwe, db.func.count(Finding.id))
+        .filter(Finding.program_id == program_id, Finding.cwe.isnot(None))
+        .group_by(Finding.cwe)
+        .order_by(db.func.count(Finding.id).desc())
+        .limit(5)
+        .all()
+    )
+    by_target = (
+        db.session.query(Finding.target, db.func.count(Finding.id))
+        .filter(Finding.program_id == program_id)
+        .group_by(Finding.target)
+        .order_by(db.func.count(Finding.id).desc())
+        .limit(5)
+        .all()
+    )
+    return {
+        "by_cwe": [{"cwe": cwe, "count": count} for cwe, count in by_cwe if cwe],
+        "by_target": [
+            {"target": target, "count": count} for target, count in by_target if target
+        ],
+    }
 
 
 @api_bp.get("/stats")
@@ -46,9 +322,6 @@ def get_stats():
     )
 
 
-# ── List / Search ─────────────────────────────────────────────────────────────
-
-
 @api_bp.get("/findings")
 @api_key_required
 def list_findings():
@@ -56,7 +329,7 @@ def list_findings():
     severity = request.args.get("severity", "")
     status = request.args.get("status", "")
     agent = request.args.get("agent", "")
-    limit = min(int(request.args.get("limit", 50)), 200)
+    limit = _limit_arg()
     offset = int(request.args.get("offset", 0))
 
     query = Finding.query
@@ -80,28 +353,27 @@ def list_findings():
     findings = (
         query.order_by(Finding.created_at.desc()).offset(offset).limit(limit).all()
     )
-
     return jsonify(
         {
             "total": total,
             "offset": offset,
             "limit": limit,
-            "findings": [f.to_dict() for f in findings],
+            "findings": [finding.to_dict() for finding in findings],
         }
     )
-
-
-# ── Get one ───────────────────────────────────────────────────────────────────
 
 
 @api_bp.get("/findings/<int:fid>")
 @api_key_required
 def get_finding(fid):
-    f = Finding.query.get_or_404(fid)
-    return jsonify(f.to_dict())
+    return jsonify(Finding.query.get_or_404(fid).to_dict())
 
 
-# ── Create ────────────────────────────────────────────────────────────────────
+@api_bp.get("/findings/<int:fid>/report-pack")
+@api_key_required
+def get_report_pack(fid):
+    finding = Finding.query.get_or_404(fid)
+    return jsonify(_build_report_pack(finding))
 
 
 @api_bp.post("/findings")
@@ -120,7 +392,15 @@ def create_finding():
     if status not in STATUSES:
         return jsonify({"error": f"status must be one of {STATUSES}"}), 400
 
-    f = Finding(
+    confidence = data.get("confidence", "high")
+    if confidence not in CONFIDENCE_LEVELS:
+        return jsonify({"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}), 400
+
+    hypothesis_id = data.get("hypothesis_id")
+    if hypothesis_id:
+        Hypothesis.query.get_or_404(hypothesis_id)
+
+    finding = Finding(
         title=data["title"].strip(),
         target=data["target"].strip(),
         platform=data.get("platform", "private"),
@@ -129,22 +409,21 @@ def create_finding():
         agent=data.get("agent", "manual"),
         cwe=data.get("cwe") or None,
         cvss=_parse_float(data.get("cvss")),
+        confidence=confidence,
         description=data.get("description", ""),
         poc=data.get("poc", ""),
         program_id=data.get("program_id") or None,
+        hypothesis_id=hypothesis_id or None,
     )
-    db.session.add(f)
+    db.session.add(finding)
     db.session.commit()
-    return jsonify(f.to_dict()), 201
-
-
-# ── Update ────────────────────────────────────────────────────────────────────
+    return jsonify(finding.to_dict()), 201
 
 
 @api_bp.patch("/findings/<int:fid>")
 @api_key_required
 def update_finding(fid):
-    f = Finding.query.get_or_404(fid)
+    finding = Finding.query.get_or_404(fid)
     data = request.get_json(force=True) or {}
 
     for field in [
@@ -158,110 +437,111 @@ def update_finding(fid):
         "program_id",
     ]:
         if field in data:
-            setattr(f, field, data[field])
+            setattr(finding, field, data[field])
+
+    if "hypothesis_id" in data:
+        hypothesis_id = data["hypothesis_id"]
+        if hypothesis_id:
+            Hypothesis.query.get_or_404(hypothesis_id)
+        finding.hypothesis_id = hypothesis_id or None
 
     if "severity" in data:
         if data["severity"] not in SEVERITIES:
             return jsonify({"error": f"severity must be one of {SEVERITIES}"}), 400
-        f.severity = data["severity"]
+        finding.severity = data["severity"]
 
     if "status" in data:
         if data["status"] not in STATUSES:
             return jsonify({"error": f"status must be one of {STATUSES}"}), 400
-        f.status = data["status"]
+        finding.status = data["status"]
+
+    if "confidence" in data:
+        if data["confidence"] not in CONFIDENCE_LEVELS:
+            return (
+                jsonify(
+                    {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
+                ),
+                400,
+            )
+        finding.confidence = data["confidence"]
 
     if "cvss" in data:
-        f.cvss = _parse_float(data["cvss"])
+        finding.cvss = _parse_float(data["cvss"])
 
-    f.updated_at = datetime.now(timezone.utc)
+    finding.updated_at = datetime.now(timezone.utc)
     db.session.commit()
-    return jsonify(f.to_dict())
-
-
-# ── Update status only ────────────────────────────────────────────────────────
+    return jsonify(finding.to_dict())
 
 
 @api_bp.patch("/findings/<int:fid>/status")
 @api_key_required
 def update_status(fid):
-    f = Finding.query.get_or_404(fid)
+    finding = Finding.query.get_or_404(fid)
     data = request.get_json(force=True) or {}
-    new = data.get("status")
-    if new not in STATUSES:
+    new_status = data.get("status")
+    if new_status not in STATUSES:
         return jsonify({"error": f"status must be one of {STATUSES}"}), 400
-    f.status = new
-    f.updated_at = datetime.now(timezone.utc)
+    finding.status = new_status
+    finding.updated_at = datetime.now(timezone.utc)
     db.session.commit()
-    return jsonify({"id": f.id, "status": f.status})
-
-
-# ── Delete ────────────────────────────────────────────────────────────────────
+    return jsonify({"id": finding.id, "status": finding.status})
 
 
 @api_bp.delete("/findings/<int:fid>")
 @api_key_required
 def delete_finding(fid):
-    f = Finding.query.get_or_404(fid)
-    db.session.delete(f)
+    finding = Finding.query.get_or_404(fid)
+    db.session.delete(finding)
     db.session.commit()
     return jsonify({"deleted": fid})
-
-
-# ── Attachments ───────────────────────────────────────────────────────────────
 
 
 @api_bp.post("/findings/<int:fid>/attachments")
 @api_key_required
 def upload_attachment(fid):
-    f = Finding.query.get_or_404(fid)
+    Finding.query.get_or_404(fid)
     data = request.get_json(force=True) or {}
 
     filename = data.get("filename")
     content_b64 = data.get("content")
-
     if not filename or not content_b64:
         return jsonify({"error": "filename and content (base64) are required"}), 400
 
-    if allowed_file(filename):
-        import base64
-        import uuid
-        import os
-        from werkzeug.utils import secure_filename
+    if not allowed_file(filename):
+        return jsonify({"error": "File type not allowed"}), 400
 
-        try:
-            content = base64.b64decode(content_b64)
-        except:
-            return jsonify({"error": "Invalid base64 content"}), 400
+    import base64
+    import os
+    import uuid
+    from werkzeug.utils import secure_filename
 
-        original = secure_filename(filename)
-        ext = original.rsplit(".", 1)[1].lower()
-        stored = f"{uuid.uuid4().hex}.{ext}"
-        dest = os.path.join(current_app.config["UPLOAD_FOLDER"], stored)
+    try:
+        content = base64.b64decode(content_b64)
+    except Exception:
+        return jsonify({"error": "Invalid base64 content"}), 400
 
-        with open(dest, "wb") as f_out:
-            f_out.write(content)
+    original = secure_filename(filename)
+    ext = original.rsplit(".", 1)[1].lower()
+    stored = f"{uuid.uuid4().hex}.{ext}"
+    dest = os.path.join(current_app.config["UPLOAD_FOLDER"], stored)
 
-        att = Attachment(
-            finding_id=fid,
-            filename=stored,
-            original_name=original,
-            path=dest,
-        )
-        db.session.add(att)
-        db.session.commit()
-        return jsonify(att.to_dict()), 201
+    with open(dest, "wb") as file_out:
+        file_out.write(content)
 
-    return jsonify({"error": "File type not allowed"}), 400
-
-
-# ── Enums ─────────────────────────────────────────────────────────────────────
+    attachment = Attachment(
+        finding_id=fid,
+        filename=stored,
+        original_name=original,
+        path=dest,
+    )
+    db.session.add(attachment)
+    db.session.commit()
+    return jsonify(attachment.to_dict()), 201
 
 
 @api_bp.get("/enums")
 @api_key_required
 def get_enums():
-    from ..models import PLATFORMS, RECON_CATEGORIES, WEBHOOK_EVENTS
-
     return jsonify(
         {
             "severities": SEVERITIES,
@@ -270,40 +550,38 @@ def get_enums():
             "platforms": PLATFORMS,
             "recon_categories": RECON_CATEGORIES,
             "webhook_events": WEBHOOK_EVENTS,
+            "confidence_levels": CONFIDENCE_LEVELS,
+            "observation_categories": OBSERVATION_CATEGORIES,
+            "observation_statuses": OBSERVATION_STATUSES,
+            "hypothesis_statuses": HYPOTHESIS_STATUSES,
+            "evidence_types": EVIDENCE_TYPES,
+            "asset_kinds": ASSET_KINDS,
+            "asset_environments": ASSET_ENVIRONMENTS,
+            "endpoint_protocols": ENDPOINT_PROTOCOLS,
         }
     )
-
-
-# ── Programs ──────────────────────────────────────────────────────────────────
 
 
 @api_bp.get("/programs")
 @api_key_required
 def list_programs():
-    from ..models import Program
-
     programs = Program.query.order_by(Program.active.desc(), Program.name).all()
-    return jsonify([p.to_dict() for p in programs])
+    return jsonify([program.to_dict() for program in programs])
 
 
 @api_bp.get("/programs/<int:pid>")
 @api_key_required
 def get_program(pid):
-    from ..models import Program
-
-    p = Program.query.get_or_404(pid)
-    return jsonify(p.to_dict())
+    return jsonify(Program.query.get_or_404(pid).to_dict())
 
 
 @api_bp.post("/programs")
 @api_key_required
 def create_program():
-    from ..models import Program
-
     data = request.get_json(force=True) or {}
     if not data.get("name"):
         return jsonify({"error": "name is required"}), 400
-    p = Program(
+    program = Program(
         name=data["name"].strip(),
         platform=data.get("platform", "private"),
         program_url=data.get("program_url"),
@@ -312,37 +590,29 @@ def create_program():
         notes=data.get("notes", ""),
         active=data.get("active", True),
     )
-    db.session.add(p)
+    db.session.add(program)
     db.session.commit()
-    return jsonify(p.to_dict()), 201
+    return jsonify(program.to_dict()), 201
 
 
 @api_bp.patch("/programs/<int:pid>")
 @api_key_required
 def update_program(pid):
-    from ..models import Program
-    from datetime import datetime, timezone
-
-    p = Program.query.get_or_404(pid)
+    program = Program.query.get_or_404(pid)
     data = request.get_json(force=True) or {}
     for field in ["name", "platform", "program_url", "scope_in", "scope_out", "notes"]:
         if field in data:
-            setattr(p, field, data[field])
+            setattr(program, field, data[field])
     if "active" in data:
-        p.active = bool(data["active"])
-    p.updated_at = datetime.now(timezone.utc)
+        program.active = bool(data["active"])
+    program.updated_at = datetime.now(timezone.utc)
     db.session.commit()
-    return jsonify(p.to_dict())
-
-
-# ── Target Context (pre-hunt Q&A) ────────────────────────────────────────────
+    return jsonify(program.to_dict())
 
 
 @api_bp.get("/programs/<int:pid>/context")
 @api_key_required
 def get_target_context(pid):
-    from ..models import TargetContext
-
     ctx = TargetContext.query.filter_by(program_id=pid).first()
     if not ctx:
         return jsonify({"program_id": pid, "data": {}})
@@ -352,8 +622,6 @@ def get_target_context(pid):
 @api_bp.put("/programs/<int:pid>/context")
 @api_key_required
 def save_target_context(pid):
-    from ..models import TargetContext, Program
-
     Program.query.get_or_404(pid)
     data = request.get_json(force=True) or {}
     payload = data.get("data", data)
@@ -368,87 +636,855 @@ def save_target_context(pid):
     return jsonify(ctx.to_dict()), 201
 
 
-# ── Recon ─────────────────────────────────────────────────────────────────────
+@api_bp.get("/programs/<int:pid>/brief")
+@api_key_required
+def get_program_brief(pid):
+    program = Program.query.get_or_404(pid)
+    context = TargetContext.query.filter_by(program_id=pid).first()
+    recent_findings = (
+        Finding.query.filter_by(program_id=pid)
+        .order_by(Finding.updated_at.desc())
+        .limit(10)
+        .all()
+    )
+    recent_recon = (
+        ReconEntry.query.filter_by(program_id=pid)
+        .order_by(ReconEntry.created_at.desc())
+        .limit(15)
+        .all()
+    )
+    open_observations = (
+        Observation.query.filter(
+            Observation.program_id == pid,
+            Observation.status.in_(["open", "testing"]),
+        )
+        .order_by(Observation.updated_at.desc())
+        .limit(10)
+        .all()
+    )
+    open_hypotheses = (
+        Hypothesis.query.filter(
+            Hypothesis.program_id == pid,
+            Hypothesis.status.in_(["open", "testing", "confirmed"]),
+        )
+        .order_by(Hypothesis.updated_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    return jsonify(
+        {
+            "program": program.to_dict(),
+            "target_context": context.to_dict() if context else {"program_id": pid, "data": {}},
+            "counts": {
+                "findings": Finding.query.filter_by(program_id=pid).count(),
+                "recon_entries": ReconEntry.query.filter_by(program_id=pid).count(),
+                "open_observations": Observation.query.filter(
+                    Observation.program_id == pid,
+                    Observation.status.in_(["open", "testing"]),
+                ).count(),
+                "open_hypotheses": Hypothesis.query.filter(
+                    Hypothesis.program_id == pid,
+                    Hypothesis.status.in_(["open", "testing", "confirmed"]),
+                ).count(),
+                "evidence_records": EvidenceRecord.query.filter_by(program_id=pid).count(),
+            },
+            "recent_findings": [_finding_summary(finding) for finding in recent_findings],
+            "recent_recon": [entry.to_dict() for entry in recent_recon],
+            "open_observations": [
+                _observation_summary(observation) for observation in open_observations
+            ],
+            "open_hypotheses": [
+                _hypothesis_summary(hypothesis) for hypothesis in open_hypotheses
+            ],
+            "duplicate_hotspots": _top_duplicate_hotspots(pid),
+        }
+    )
 
 
 @api_bp.get("/programs/<int:pid>/recon")
 @api_key_required
 def list_recon(pid):
-    from ..models import ReconEntry
-
     category = request.args.get("category", "")
     query = ReconEntry.query.filter_by(program_id=pid)
     if category:
         query = query.filter_by(category=category)
     entries = query.order_by(ReconEntry.category, ReconEntry.created_at.desc()).all()
-    return jsonify([e.to_dict() for e in entries])
+    return jsonify([entry.to_dict() for entry in entries])
 
 
 @api_bp.post("/programs/<int:pid>/recon")
 @api_key_required
 def add_recon(pid):
-    from ..models import ReconEntry, Program
-
     Program.query.get_or_404(pid)
     data = request.get_json(force=True) or {}
     if not data.get("value"):
         return jsonify({"error": "value is required"}), 400
-    r = ReconEntry(
+    recon_entry = ReconEntry(
         program_id=pid,
         category=data.get("category", "subdomain"),
         value=data["value"].strip(),
         notes=data.get("notes", ""),
         source=data.get("source", ""),
     )
-    db.session.add(r)
+    db.session.add(recon_entry)
     db.session.commit()
-    return jsonify(r.to_dict()), 201
+    return jsonify(recon_entry.to_dict()), 201
 
 
 @api_bp.delete("/recon/<int:rid>")
 @api_key_required
 def delete_recon(rid):
-    from ..models import ReconEntry
-
-    r = ReconEntry.query.get_or_404(rid)
-    db.session.delete(r)
+    recon_entry = ReconEntry.query.get_or_404(rid)
+    db.session.delete(recon_entry)
     db.session.commit()
     return jsonify({"deleted": rid})
 
 
-# ── Notes ─────────────────────────────────────────────────────────────────────
+@api_bp.get("/programs/<int:pid>/observations")
+@api_key_required
+def list_observations(pid):
+    Program.query.get_or_404(pid)
+    status = request.args.get("status", "").strip()
+    category = request.args.get("category", "").strip()
+    query = Observation.query.filter_by(program_id=pid)
+    if status:
+        query = query.filter_by(status=status)
+    if category:
+        query = query.filter_by(category=category)
+    observations = query.order_by(Observation.updated_at.desc()).limit(_limit_arg()).all()
+    return jsonify([observation.to_dict() for observation in observations])
+
+
+@api_bp.post("/programs/<int:pid>/observations")
+@api_key_required
+def create_observation(pid):
+    Program.query.get_or_404(pid)
+    data = request.get_json(force=True) or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+
+    category = data.get("category", "other")
+    if category not in OBSERVATION_CATEGORIES:
+        return (
+            jsonify(
+                {
+                    "error": f"category must be one of {OBSERVATION_CATEGORIES}"
+                }
+            ),
+            400,
+        )
+
+    status = data.get("status", "open")
+    if status not in OBSERVATION_STATUSES:
+        return (
+            jsonify({"error": f"status must be one of {OBSERVATION_STATUSES}"}),
+            400,
+        )
+
+    confidence = data.get("confidence", "medium")
+    if confidence not in CONFIDENCE_LEVELS:
+        return (
+            jsonify(
+                {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
+            ),
+            400,
+        )
+
+    observation = Observation(
+        program_id=pid,
+        title=title,
+        summary=data.get("summary", ""),
+        category=category,
+        status=status,
+        agent=data.get("agent", "manual"),
+        source_tool=data.get("source_tool"),
+        confidence=confidence,
+    )
+    db.session.add(observation)
+    db.session.commit()
+    return jsonify(observation.to_dict()), 201
+
+
+@api_bp.get("/observations/<int:oid>")
+@api_key_required
+def get_observation(oid):
+    return jsonify(Observation.query.get_or_404(oid).to_dict())
+
+
+@api_bp.patch("/observations/<int:oid>")
+@api_key_required
+def update_observation(oid):
+    observation = Observation.query.get_or_404(oid)
+    data = request.get_json(force=True) or {}
+
+    for field in ["title", "summary", "agent", "source_tool"]:
+        if field in data:
+            setattr(observation, field, data[field])
+
+    if "category" in data:
+        if data["category"] not in OBSERVATION_CATEGORIES:
+            return (
+                jsonify(
+                    {
+                        "error": f"category must be one of {OBSERVATION_CATEGORIES}"
+                    }
+                ),
+                400,
+            )
+        observation.category = data["category"]
+
+    if "status" in data:
+        if data["status"] not in OBSERVATION_STATUSES:
+            return (
+                jsonify({"error": f"status must be one of {OBSERVATION_STATUSES}"}),
+                400,
+            )
+        observation.status = data["status"]
+
+    if "confidence" in data:
+        if data["confidence"] not in CONFIDENCE_LEVELS:
+            return (
+                jsonify(
+                    {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
+                ),
+                400,
+            )
+        observation.confidence = data["confidence"]
+
+    observation.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify(observation.to_dict())
+
+
+@api_bp.post("/observations/<int:oid>/promote")
+@api_key_required
+def promote_observation(oid):
+    observation = Observation.query.get_or_404(oid)
+    data = request.get_json(force=True) or {}
+
+    title = (data.get("title") or observation.title).strip()
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+
+    severity_hint = data.get("severity_hint")
+    if severity_hint and severity_hint not in SEVERITIES:
+        return jsonify({"error": f"severity_hint must be one of {SEVERITIES}"}), 400
+
+    status = data.get("status", "open")
+    if status not in HYPOTHESIS_STATUSES:
+        return jsonify({"error": f"status must be one of {HYPOTHESIS_STATUSES}"}), 400
+
+    confidence = data.get("confidence", observation.confidence)
+    if confidence not in CONFIDENCE_LEVELS:
+        return jsonify({"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}), 400
+
+    hypothesis = Hypothesis(
+        program_id=observation.program_id,
+        observation_id=observation.id,
+        title=title,
+        weakness_hint=data.get("weakness_hint"),
+        cwe=data.get("cwe"),
+        severity_hint=severity_hint,
+        attack_path=data.get("attack_path", observation.summary),
+        impact_hypothesis=data.get("impact_hypothesis", ""),
+        status=status,
+        agent=data.get("agent", observation.agent),
+        confidence=confidence,
+    )
+    observation.status = "promoted"
+    observation.updated_at = datetime.now(timezone.utc)
+
+    db.session.add(hypothesis)
+    db.session.commit()
+    return jsonify({"observation": observation.to_dict(), "hypothesis": hypothesis.to_dict()}), 201
+
+
+@api_bp.get("/programs/<int:pid>/hypotheses")
+@api_key_required
+def list_hypotheses(pid):
+    Program.query.get_or_404(pid)
+    status = request.args.get("status", "").strip()
+    query = Hypothesis.query.filter_by(program_id=pid)
+    if status:
+        query = query.filter_by(status=status)
+    hypotheses = query.order_by(Hypothesis.updated_at.desc()).limit(_limit_arg()).all()
+    return jsonify([hypothesis.to_dict() for hypothesis in hypotheses])
+
+
+@api_bp.post("/programs/<int:pid>/hypotheses")
+@api_key_required
+def create_hypothesis(pid):
+    Program.query.get_or_404(pid)
+    data = request.get_json(force=True) or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+
+    status = data.get("status", "open")
+    if status not in HYPOTHESIS_STATUSES:
+        return (
+            jsonify({"error": f"status must be one of {HYPOTHESIS_STATUSES}"}),
+            400,
+        )
+
+    confidence = data.get("confidence", "medium")
+    if confidence not in CONFIDENCE_LEVELS:
+        return (
+            jsonify(
+                {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
+            ),
+            400,
+        )
+
+    severity_hint = data.get("severity_hint")
+    if severity_hint and severity_hint not in SEVERITIES:
+        return jsonify({"error": f"severity_hint must be one of {SEVERITIES}"}), 400
+
+    observation_id = data.get("observation_id")
+    if observation_id:
+        observation = Observation.query.get_or_404(observation_id)
+        if observation.program_id != pid:
+            return jsonify({"error": "observation_id does not belong to this program"}), 400
+
+    hypothesis = Hypothesis(
+        program_id=pid,
+        observation_id=observation_id or None,
+        title=title,
+        weakness_hint=data.get("weakness_hint"),
+        cwe=data.get("cwe"),
+        severity_hint=severity_hint,
+        attack_path=data.get("attack_path", ""),
+        impact_hypothesis=data.get("impact_hypothesis", ""),
+        status=status,
+        agent=data.get("agent", "manual"),
+        confidence=confidence,
+    )
+    db.session.add(hypothesis)
+    db.session.commit()
+    return jsonify(hypothesis.to_dict()), 201
+
+
+@api_bp.get("/hypotheses/<int:hid>")
+@api_key_required
+def get_hypothesis(hid):
+    return jsonify(Hypothesis.query.get_or_404(hid).to_dict())
+
+
+@api_bp.patch("/hypotheses/<int:hid>")
+@api_key_required
+def update_hypothesis(hid):
+    hypothesis = Hypothesis.query.get_or_404(hid)
+    data = request.get_json(force=True) or {}
+
+    for field in [
+        "title",
+        "weakness_hint",
+        "cwe",
+        "attack_path",
+        "impact_hypothesis",
+        "agent",
+    ]:
+        if field in data:
+            setattr(hypothesis, field, data[field])
+
+    if "severity_hint" in data:
+        severity_hint = data["severity_hint"]
+        if severity_hint and severity_hint not in SEVERITIES:
+            return jsonify({"error": f"severity_hint must be one of {SEVERITIES}"}), 400
+        hypothesis.severity_hint = severity_hint
+
+    if "status" in data:
+        if data["status"] not in HYPOTHESIS_STATUSES:
+            return (
+                jsonify({"error": f"status must be one of {HYPOTHESIS_STATUSES}"}),
+                400,
+            )
+        hypothesis.status = data["status"]
+
+    if "confidence" in data:
+        if data["confidence"] not in CONFIDENCE_LEVELS:
+            return (
+                jsonify(
+                    {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
+                ),
+                400,
+            )
+        hypothesis.confidence = data["confidence"]
+
+    if "observation_id" in data:
+        observation_id = data["observation_id"]
+        if observation_id:
+            observation = Observation.query.get_or_404(observation_id)
+            if observation.program_id != hypothesis.program_id:
+                return jsonify({"error": "observation_id does not belong to this program"}), 400
+        hypothesis.observation_id = observation_id or None
+
+    hypothesis.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify(hypothesis.to_dict())
+
+
+@api_bp.post("/hypotheses/<int:hid>/promote")
+@api_key_required
+def promote_hypothesis(hid):
+    hypothesis = Hypothesis.query.get_or_404(hid)
+    data = request.get_json(force=True) or {}
+
+    title = (data.get("title") or hypothesis.title).strip()
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+
+    severity = data.get("severity") or hypothesis.severity_hint or "medium"
+    if severity not in SEVERITIES:
+        return jsonify({"error": f"severity must be one of {SEVERITIES}"}), 400
+
+    status = data.get("status", "discovered")
+    if status not in STATUSES:
+        return jsonify({"error": f"status must be one of {STATUSES}"}), 400
+
+    confidence = data.get("confidence", "high")
+    if confidence not in CONFIDENCE_LEVELS:
+        return jsonify({"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}), 400
+
+    finding = Finding(
+        program_id=hypothesis.program_id,
+        hypothesis_id=hypothesis.id,
+        title=title,
+        target=(data.get("target") or _derive_target_from_hypothesis(hypothesis)).strip(),
+        platform=data.get("platform", hypothesis.program.platform),
+        severity=severity,
+        status=status,
+        agent=data.get("agent", hypothesis.agent),
+        cwe=data.get("cwe") or hypothesis.cwe,
+        cvss=_parse_float(data.get("cvss")),
+        confidence=confidence,
+        description=data.get("description", ""),
+        poc=data.get("poc", ""),
+    )
+    hypothesis.status = "promoted"
+    hypothesis.updated_at = datetime.now(timezone.utc)
+
+    db.session.add(finding)
+    db.session.commit()
+    return jsonify({"hypothesis": hypothesis.to_dict(), "finding": finding.to_dict()}), 201
+
+
+@api_bp.get("/programs/<int:pid>/evidence")
+@api_key_required
+def list_evidence(pid):
+    Program.query.get_or_404(pid)
+    query = EvidenceRecord.query.filter_by(program_id=pid)
+
+    finding_id = request.args.get("finding_id", type=int)
+    hypothesis_id = request.args.get("hypothesis_id", type=int)
+    observation_id = request.args.get("observation_id", type=int)
+    evidence_type = request.args.get("evidence_type", "").strip()
+
+    if finding_id:
+        query = query.filter_by(finding_id=finding_id)
+    if hypothesis_id:
+        query = query.filter_by(hypothesis_id=hypothesis_id)
+    if observation_id:
+        query = query.filter_by(observation_id=observation_id)
+    if evidence_type:
+        query = query.filter_by(evidence_type=evidence_type)
+
+    evidence = query.order_by(EvidenceRecord.created_at.desc()).limit(_limit_arg()).all()
+    return jsonify([record.to_dict() for record in evidence])
+
+
+@api_bp.post("/evidence")
+@api_key_required
+def create_evidence():
+    data = request.get_json(force=True) or {}
+
+    program_id = data.get("program_id")
+    if not program_id:
+        return jsonify({"error": "program_id is required"}), 400
+    Program.query.get_or_404(program_id)
+
+    title = (data.get("title") or "").strip()
+    if not title:
+        request_method = data.get("request_method")
+        request_url = data.get("request_url")
+        if request_method and request_url:
+            title = f"{request_method} {request_url}"
+        else:
+            return jsonify({"error": "title is required"}), 400
+
+    evidence_type = data.get("evidence_type", "other")
+    if evidence_type not in EVIDENCE_TYPES:
+        return jsonify({"error": f"evidence_type must be one of {EVIDENCE_TYPES}"}), 400
+
+    finding_id = data.get("finding_id") or None
+    hypothesis_id = data.get("hypothesis_id") or None
+    observation_id = data.get("observation_id") or None
+
+    if finding_id:
+        finding = Finding.query.get_or_404(finding_id)
+        if finding.program_id and finding.program_id != program_id:
+            return jsonify({"error": "finding_id does not belong to this program"}), 400
+    if hypothesis_id:
+        hypothesis = Hypothesis.query.get_or_404(hypothesis_id)
+        if hypothesis.program_id != program_id:
+            return jsonify({"error": "hypothesis_id does not belong to this program"}), 400
+    if observation_id:
+        observation = Observation.query.get_or_404(observation_id)
+        if observation.program_id != program_id:
+            return jsonify({"error": "observation_id does not belong to this program"}), 400
+
+    evidence = EvidenceRecord(
+        program_id=program_id,
+        finding_id=finding_id,
+        hypothesis_id=hypothesis_id,
+        observation_id=observation_id,
+        evidence_type=evidence_type,
+        title=title,
+        summary=data.get("summary", ""),
+        request_method=data.get("request_method"),
+        request_url=data.get("request_url"),
+        request_headers_json=_json_text(data.get("request_headers")),
+        request_body_text=data.get("request_body_text"),
+        response_status=_parse_int(data.get("response_status")),
+        response_headers_json=_json_text(data.get("response_headers")),
+        response_body_text=data.get("response_body_text"),
+        account_label=data.get("account_label"),
+        auth_type=data.get("auth_type"),
+        source_tool=data.get("source_tool"),
+        occurred_at=_parse_datetime(data.get("occurred_at")),
+    )
+    db.session.add(evidence)
+    db.session.commit()
+    return jsonify(evidence.to_dict()), 201
+
+
+@api_bp.get("/evidence/<int:eid>")
+@api_key_required
+def get_evidence(eid):
+    return jsonify(EvidenceRecord.query.get_or_404(eid).to_dict())
+
+
+@api_bp.patch("/evidence/<int:eid>")
+@api_key_required
+def update_evidence(eid):
+    evidence = EvidenceRecord.query.get_or_404(eid)
+    data = request.get_json(force=True) or {}
+
+    for field in [
+        "title",
+        "summary",
+        "request_method",
+        "request_url",
+        "request_body_text",
+        "response_body_text",
+        "account_label",
+        "auth_type",
+        "source_tool",
+    ]:
+        if field in data:
+            setattr(evidence, field, data[field])
+
+    if "evidence_type" in data:
+        if data["evidence_type"] not in EVIDENCE_TYPES:
+            return jsonify({"error": f"evidence_type must be one of {EVIDENCE_TYPES}"}), 400
+        evidence.evidence_type = data["evidence_type"]
+
+    if "response_status" in data:
+        evidence.response_status = _parse_int(data["response_status"])
+
+    if "request_headers" in data:
+        evidence.request_headers_json = _json_text(data["request_headers"])
+    if "response_headers" in data:
+        evidence.response_headers_json = _json_text(data["response_headers"])
+    if "occurred_at" in data:
+        evidence.occurred_at = _parse_datetime(data["occurred_at"])
+
+    db.session.commit()
+    return jsonify(evidence.to_dict())
+
+
+# ── Assets ─────────────────────────────────────────────────────────────────
+
+
+@api_bp.get("/programs/<int:pid>/assets")
+@api_key_required
+def list_assets(pid):
+    Program.query.get_or_404(pid)
+    kind = request.args.get("kind", "").strip()
+    query = Asset.query.filter_by(program_id=pid)
+    if kind:
+        query = query.filter_by(kind=kind)
+    assets = query.order_by(Asset.kind, Asset.identifier).all()
+    return jsonify([asset.to_dict() for asset in assets])
+
+
+@api_bp.post("/programs/<int:pid>/assets")
+@api_key_required
+def create_asset(pid):
+    Program.query.get_or_404(pid)
+    data = request.get_json(force=True) or {}
+    identifier = (data.get("identifier") or "").strip()
+    if not identifier:
+        return jsonify({"error": "identifier is required"}), 400
+    kind = data.get("kind", "other")
+    if kind not in ASSET_KINDS:
+        return jsonify({"error": f"kind must be one of {ASSET_KINDS}"}), 400
+    environment = data.get("environment", "unknown")
+    if environment not in ASSET_ENVIRONMENTS:
+        return jsonify({"error": f"environment must be one of {ASSET_ENVIRONMENTS}"}), 400
+    asset = Asset(
+        program_id=pid,
+        kind=kind,
+        identifier=identifier,
+        environment=environment,
+        notes=data.get("notes", ""),
+        active=data.get("active", True),
+    )
+    db.session.add(asset)
+    db.session.commit()
+    return jsonify(asset.to_dict()), 201
+
+
+@api_bp.patch("/assets/<int:aid>")
+@api_key_required
+def update_asset(aid):
+    asset = Asset.query.get_or_404(aid)
+    data = request.get_json(force=True) or {}
+    for field in ["identifier", "notes"]:
+        if field in data:
+            setattr(asset, field, data[field])
+    if "kind" in data:
+        if data["kind"] not in ASSET_KINDS:
+            return jsonify({"error": f"kind must be one of {ASSET_KINDS}"}), 400
+        asset.kind = data["kind"]
+    if "environment" in data:
+        if data["environment"] not in ASSET_ENVIRONMENTS:
+            return jsonify({"error": f"environment must be one of {ASSET_ENVIRONMENTS}"}), 400
+        asset.environment = data["environment"]
+    if "active" in data:
+        asset.active = bool(data["active"])
+    asset.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify(asset.to_dict())
+
+
+@api_bp.delete("/assets/<int:aid>")
+@api_key_required
+def delete_asset(aid):
+    asset = Asset.query.get_or_404(aid)
+    db.session.delete(asset)
+    db.session.commit()
+    return jsonify({"deleted": aid})
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────
+
+
+@api_bp.get("/assets/<int:aid>/endpoints")
+@api_key_required
+def list_endpoints(aid):
+    Asset.query.get_or_404(aid)
+    method = request.args.get("method", "").strip()
+    query = Endpoint.query.filter_by(asset_id=aid)
+    if method:
+        query = query.filter_by(method=method)
+    endpoints = query.order_by(Endpoint.method, Endpoint.path).all()
+    return jsonify([endpoint.to_dict() for endpoint in endpoints])
+
+
+@api_bp.post("/assets/<int:aid>/endpoints")
+@api_key_required
+def create_endpoint(aid):
+    Asset.query.get_or_404(aid)
+    data = request.get_json(force=True) or {}
+    path = (data.get("path") or "").strip()
+    if not path:
+        return jsonify({"error": "path is required"}), 400
+    method = data.get("method", "GET")
+    protocol = data.get("protocol", "https")
+    if protocol not in ENDPOINT_PROTOCOLS:
+        return jsonify({"error": f"protocol must be one of {ENDPOINT_PROTOCOLS}"}), 400
+    endpoint = Endpoint(
+        asset_id=aid,
+        method=method,
+        path=path,
+        protocol=protocol,
+        content_type=data.get("content_type"),
+        auth_required=data.get("auth_required"),
+        discovered_by=data.get("discovered_by"),
+        notes=data.get("notes", ""),
+    )
+    db.session.add(endpoint)
+    db.session.commit()
+    return jsonify(endpoint.to_dict()), 201
+
+
+@api_bp.patch("/endpoints/<int:eid>")
+@api_key_required
+def update_endpoint(eid):
+    endpoint = Endpoint.query.get_or_404(eid)
+    data = request.get_json(force=True) or {}
+    for field in ["path", "content_type", "discovered_by", "notes"]:
+        if field in data:
+            setattr(endpoint, field, data[field])
+    if "method" in data:
+        endpoint.method = data["method"]
+    if "protocol" in data:
+        if data["protocol"] not in ENDPOINT_PROTOCOLS:
+            return jsonify({"error": f"protocol must be one of {ENDPOINT_PROTOCOLS}"}), 400
+        endpoint.protocol = data["protocol"]
+    if "auth_required" in data:
+        endpoint.auth_required = bool(data["auth_required"]) if data["auth_required"] is not None else None
+    endpoint.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify(endpoint.to_dict())
+
+
+@api_bp.delete("/endpoints/<int:eid>")
+@api_key_required
+def delete_endpoint(eid):
+    endpoint = Endpoint.query.get_or_404(eid)
+    db.session.delete(endpoint)
+    db.session.commit()
+    return jsonify({"deleted": eid})
+
+
+@api_bp.post("/similarity/check")
+@api_key_required
+def similarity_check():
+    data = request.get_json(force=True) or {}
+
+    query = {
+        "program_id": data.get("program_id"),
+        "target": data.get("target") or data.get("asset_identifier"),
+        "title": data.get("title"),
+        "cwe": data.get("cwe"),
+        "description": data.get("description"),
+    }
+
+    if not any([query["target"], query["title"], query["cwe"], query["description"]]):
+        return jsonify({"error": "provide target, title, cwe, or description"}), 400
+
+    program_id = query["program_id"]
+
+    finding_query = Finding.query
+    observation_query = Observation.query
+    hypothesis_query = Hypothesis.query
+    if program_id:
+        finding_query = finding_query.filter_by(program_id=program_id)
+        observation_query = observation_query.filter_by(program_id=program_id)
+        hypothesis_query = hypothesis_query.filter_by(program_id=program_id)
+
+    scored = []
+
+    for finding in finding_query.order_by(Finding.updated_at.desc()).limit(150).all():
+        score, reasons = _similarity_score(
+            {
+                "id": finding.id,
+                "title": finding.title,
+                "target": finding.target,
+                "cwe": finding.cwe,
+                "description": finding.description,
+            },
+            query,
+        )
+        if score >= 20:
+            relation = "exact_match" if score >= 65 else "likely_duplicate" if score >= 40 else "related_work"
+            scored.append(
+                {
+                    "kind": "finding",
+                    "relation": relation,
+                    "score": score,
+                    "reasons": reasons,
+                    "item": _finding_summary(finding),
+                }
+            )
+
+    for observation in observation_query.order_by(Observation.updated_at.desc()).limit(150).all():
+        score, reasons = _similarity_score(
+            {
+                "id": observation.id,
+                "title": observation.title,
+                "program_name": observation.program.name if observation.program else "",
+                "summary": observation.summary,
+            },
+            query,
+        )
+        if score >= 20:
+            relation = "likely_duplicate" if score >= 45 else "related_work"
+            scored.append(
+                {
+                    "kind": "observation",
+                    "relation": relation,
+                    "score": score,
+                    "reasons": reasons,
+                    "item": _observation_summary(observation),
+                }
+            )
+
+    for hypothesis in hypothesis_query.order_by(Hypothesis.updated_at.desc()).limit(150).all():
+        score, reasons = _similarity_score(
+            {
+                "id": hypothesis.id,
+                "title": hypothesis.title,
+                "program_name": hypothesis.program.name if hypothesis.program else "",
+                "cwe": hypothesis.cwe,
+                "summary": hypothesis.attack_path or hypothesis.impact_hypothesis,
+            },
+            query,
+        )
+        if score >= 20:
+            relation = "exact_match" if score >= 65 else "likely_duplicate" if score >= 40 else "related_work"
+            scored.append(
+                {
+                    "kind": "hypothesis",
+                    "relation": relation,
+                    "score": score,
+                    "reasons": reasons,
+                    "item": _hypothesis_summary(hypothesis),
+                }
+            )
+
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    exact_matches = [item for item in scored if item["relation"] == "exact_match"][:10]
+    likely_duplicates = [item for item in scored if item["relation"] == "likely_duplicate"][:10]
+    related_work = [item for item in scored if item["relation"] == "related_work"][:10]
+
+    return jsonify(
+        {
+            "query": query,
+            "exact_matches": exact_matches,
+            "likely_duplicates": likely_duplicates,
+            "related_work": related_work,
+        }
+    )
 
 
 @api_bp.post("/findings/<int:fid>/notes")
 @api_key_required
 def add_note(fid):
-    from ..models import Note
-
     data = request.get_json(force=True) or {}
     if not data.get("content"):
         return jsonify({"error": "content is required"}), 400
-    n = Note(
+    note = Note(
         finding_id=fid,
         content=data["content"],
         agent=data.get("agent", "manual"),
     )
-    db.session.add(n)
+    db.session.add(note)
     db.session.commit()
-    return jsonify(n.to_dict()), 201
+    return jsonify(note.to_dict()), 201
 
 
 @api_bp.delete("/notes/<int:nid>")
 @api_key_required
 def delete_note(nid):
-    from ..models import Note
-
-    n = Note.query.get_or_404(nid)
-    db.session.delete(n)
+    note = Note.query.get_or_404(nid)
+    db.session.delete(note)
     db.session.commit()
     return jsonify({"deleted": nid})
-
-
-# ── Search similar ────────────────────────────────────────────────────────────
 
 
 @api_bp.get("/findings/similar")
@@ -475,19 +1511,14 @@ def search_similar():
     return jsonify(
         {
             "count": len(results),
-            "findings": [f.to_dict() for f in results],
+            "findings": [finding.to_dict() for finding in results],
         }
     )
-
-
-# ── Bulk status update ────────────────────────────────────────────────────────
 
 
 @api_bp.patch("/findings/bulk/status")
 @api_key_required
 def bulk_update_status():
-    from datetime import datetime, timezone
-
     data = request.get_json(force=True) or {}
     ids = data.get("ids", [])
     status = data.get("status")
@@ -495,18 +1526,16 @@ def bulk_update_status():
         return jsonify({"error": "ids (list) and status are required"}), 400
     if status not in STATUSES:
         return jsonify({"error": f"status must be one of {STATUSES}"}), 400
+
     updated = []
     for fid in ids:
-        f = Finding.query.get(fid)
-        if f:
-            f.status = status
-            f.updated_at = datetime.now(timezone.utc)
+        finding = db.session.get(Finding, fid)
+        if finding:
+            finding.status = status
+            finding.updated_at = datetime.now(timezone.utc)
             updated.append(fid)
     db.session.commit()
     return jsonify({"updated": updated, "status": status})
-
-
-# ── Notify ────────────────────────────────────────────────────────────────────
 
 
 @api_bp.post("/notify")

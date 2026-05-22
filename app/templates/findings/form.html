@@ -63,6 +63,24 @@
     color: var(--accent2);
     margin-bottom: 16px;
   }
+  .duplicate-check {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 14px;
+  }
+  .duplicate-results {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .duplicate-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
 </style>
 {% endblock %}
 
@@ -161,6 +179,18 @@
         </div>
       </div>
 
+      {% if not finding %}
+      <div class="duplicate-check">
+        <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Duplicate Check</div>
+        <div class="tiny">Check existing findings, hypotheses, and observations before creating a new finding.</div>
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost btn-sm" id="duplicate-check-btn">Check Existing Work</button>
+          <span id="duplicate-check-status" class="tiny"></span>
+        </div>
+        <div id="duplicate-results" class="duplicate-results"></div>
+      </div>
+      {% endif %}
+
       <!-- Description -->
       <div class="section-divider">Description</div>
       <div class="form-group">
@@ -217,8 +247,9 @@
 {% block extra_scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/easymde/2.18.0/easymde.min.js"></script>
 <script>
+  const editors = {};
   ['description','poc'].forEach(id => {
-    new EasyMDE({
+    editors[id] = new EasyMDE({
       element: document.getElementById(id),
       spellChecker: false,
       autosave: { enabled: false },
@@ -231,5 +262,58 @@
     const names = Array.from(this.files).map(f => f.name).join(', ');
     document.getElementById('file-list').textContent = names || '';
   });
+
+  const duplicateBtn = document.getElementById('duplicate-check-btn');
+  if (duplicateBtn) {
+    duplicateBtn.addEventListener('click', async () => {
+      const statusEl = document.getElementById('duplicate-check-status');
+      const resultsEl = document.getElementById('duplicate-results');
+      statusEl.textContent = 'Checking…';
+      resultsEl.innerHTML = '';
+
+      const params = new URLSearchParams({
+        title: document.getElementById('title').value.trim(),
+        target: document.getElementById('target').value.trim(),
+        cwe: document.getElementById('cwe').value.trim(),
+        description: editors.description?.value().trim() || '',
+        program_id: '{{ program.id if program else "" }}'
+      });
+
+      try {
+        const res = await fetch(`{{ url_for('findings.check_existing') }}?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok) {
+          statusEl.textContent = data.error || 'Check failed.';
+          return;
+        }
+        const matches = data.matches || [];
+        statusEl.textContent = matches.length ? `${matches.length} possible matches found.` : 'No obvious matches found.';
+        if (!matches.length) {
+          return;
+        }
+        resultsEl.innerHTML = matches.map(match => `
+          <div class="duplicate-card">
+            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <strong>${escapeHtml(match.title)}</strong>
+              <span class="tiny">score ${match.score}</span>
+            </div>
+            <div class="tiny" style="margin-top:6px">${escapeHtml(match.kind)} · ${escapeHtml(match.status)} · ${escapeHtml(match.target || '')}</div>
+            <div class="tiny" style="margin-top:6px">${(match.reasons || []).map(escapeHtml).join(', ')}</div>
+          </div>
+        `).join('');
+      } catch (err) {
+        statusEl.textContent = 'Check failed.';
+      }
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
 </script>
 {% endblock %}

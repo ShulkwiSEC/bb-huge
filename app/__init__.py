@@ -36,6 +36,10 @@ def create_app(config_object="config.Config"):
     )
 
     with app.app_context():
+        # Bootstrap all currently declared tables for fresh installs.
         db.create_all()
+        # Apply explicit versioned schema upgrades for existing databases.
+        from .migrations import run_migrations
+        run_migrations()
 
     return app

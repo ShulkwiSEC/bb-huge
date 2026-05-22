@@ -2,16 +2,16 @@
 
 > `/bb-huge` — one command. Senior Bug Hunter, loaded.
 
-Not a portal. A **Context Engineering Architecture** that converts your AI agent into a disciplined bug bounty hunter with a single slash command. The web UI is just the visible tip — the real power is what happens inside the agent's brain when the skill fires.
+Not a portal. A **Context Engineering Architecture** that converts your AI agent into a disciplined bug bounty hunter with a single slash command. The web UI is the visible tip — the real power is what happens inside the agent's brain when the skill fires.
 
-<!-- Demo Video /and ui demo -->
+<!-- Demo Video -->
 | | |
 |---|---|
-| [![Demo](assets/images/bb-huge-demo-thumbnail.webp)](https://github.com/user-attachments/assets/a4c49a73-e6b4-4902-b581-1e20abd244a8) | ![Demo](assets/images/ui-demo.webp)|
+| [![Demo](assets/images/bb-huge-demo-thumbnail.webp)](https://github.com/user-attachments/assets/e8f98cdb-d679-4099-be2a-0a6dd4a6acf9) | |
 
 ---
 
-## The Architecture — What's Actually Happening
+## The Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -22,11 +22,11 @@ Not a portal. A **Context Engineering Architecture** that converts your AI agent
            │  triggers skill                     │   example.com"
            ▼                                     ▼
 ┌──────────────────────────┐    ┌──────────────────────────────┐
-│  SKILL.md (266 lines)    │    │  MCP stdio Server            │
-│  • Senior Bug Hunter     │    │  • 15+ tools (CRUD + more)   │
+│  SKILL.md                │    │  MCP stdio Server            │
+│  • Senior Bug Hunter     │    │  • 30+ tools (CRUD + more)   │
 │    persona injected      │    │  • stdio transport           │
-│  • 5 SOPs loaded         │◄──►│  • stateless, fast           │
-│  • Severity/Status refs  │    │  • any agent, same API       │
+│  • 6 SOPs loaded         │◄──►│  • stateless, fast           │
+│  • Full tool reference   │    │  • any agent, same API       │
 └──────────┬───────────────┘    └──────────┬───────────────────┘
            │                               │
            ▼                               ▼
@@ -35,17 +35,33 @@ Not a portal. A **Context Engineering Architecture** that converts your AI agent
 │  • bb-orchestrator.md    │    │  • Dashboard, Charts         │
 │  • bb-operator.md        │    │  • Findings CRUD             │
 │  • bb-recon.md           │    │  • Programs tracking         │
-│  • bb-eligible-vulns.md  │    │  • Attachments               │
-│  • bb-standards.md       │    │  • Webhooks (Discord/TG)     │
-│  • bb-report-templates   │    │  • REST API v1               │
-└──────────────────────────┘    └──────────────────────────────┘
+│  • bb-eligible-vulns.md  │    │  • Observations/Hypotheses   │
+│  • bb-standards.md       │    │  • Evidence pipeline         │
+│  • bb-report-templates   │    │  • Assets & Endpoints        │
+└──────────────────────────┘    │  • Recon, Attachments        │
+                                │  • REST API                  │
+                                │  • Webhooks (Discord/TG)     │
+                                └──────────────────────────────┘
 ```
 
-Two systems, one interface. The **skill layer** gives the agent knowledge & discipline. The **portal layer** gives it persistent memory. They never touch each other — they communicate through MCP.
+Two systems, one interface. The **skill layer** gives the agent knowledge & discipline. The **portal layer** gives it persistent memory. They communicate through MCP.
 
 ---
 
-## Why This Works (The Insight)
+## The Signal Pipeline
+
+bb-huge captures bug bounty work at every confidence level, from vague suspicion to confirmed payout:
+
+```
+Observation ──promote──► Hypothesis ──promote──► Finding
+   (signal)                (candidate)            (confirmed)
+```
+
+Each step preserves provenance — a promoted finding keeps a link back to the hypothesis and observation it came from, along with the evidence that supports it.
+
+---
+
+## Why This Works
 
 Every bug hunter has the same problem: **context resets to zero every session**.
 
@@ -55,15 +71,18 @@ bb-huge fixes this at the architectural level:
 
 | Problem | How bb-huge solves it |
 |---------|----------------------|
-| Agent forgets between sessions | Portal stores everything — findings, notes, attachments, status |
+| Agent forgets between sessions | Portal stores everything — findings, notes, attachments, evidence |
+| You forget hunches and half-baked ideas | Observations & Hypotheses capture signals before they're findings |
+| Losing evidence between sessions | Structured evidence records (HTTP pairs, screenshots) linked to findings |
+| Disorganized attack surface | Assets & Endpoints track domains, hosts, API routes per program |
 | You forget the methodology | Skill injects Senior Bug Hunter SOPs into every new session |
 | You waste time on setup | `/bb-huge` command boots everything in one call |
 | You skip logging "small" things | Skill enforces *capture-first* discipline |
 | Multiple agents, no coordination | Each agent sets its own `agent` field, stats show all activity |
-| Writing reports is painful | 5 ready-to-use templates (XSS, SQLi, IDOR, SSRF, Stored XSS) |
+| Writing reports is painful | Report pack generator + ready-to-use report templates |
 | Scope confusion | Standards reference loaded at session start |
-| Testing blind — no creds, no context | SOP-5 questioning layer asks user once, persists forever |
-| Forgetting setup details between sessions | `bb_get_context()` loads all pre-hunt Q&A on every start |
+| Testing blind — no creds, no context | Pre-hunt Q&A asks user once, persists forever |
+| Duplicate work | Similarity check scans existing findings/hypotheses before you create |
 
 ---
 
@@ -74,19 +93,20 @@ When you type the command, the agent's brain gets injected with:
 ```mermaid
 graph TB
     C["/bb-huge command"] --> SKILL[SKILL.md]
+    SKILL --> SOP0["SOP-0: Session Init<br/>Load skill, get brief"]
     SKILL --> SOP1["SOP-1: New Target<br/>Recon setup, skill roster"]
-    SKILL --> SOP2["SOP-2: Vulnerability Found<br/>Capture-first protocol"]
-    SKILL --> SOP3["SOP-3: Resume Finding<br/>Restore full context"]
+    SKILL --> SOP2["SOP-2: Vulnerability Found<br/>Capture-first + evidence pipeline"]
+    SKILL --> SOP3["SOP-3: Resume Finding<br/>Full context restore"]
     SKILL --> SOP4["SOP-4: End Session<br/>Closeout checklist"]
-    SKILL --> SOP5["SOP-5: Pre-Hunt Q&A ⭐<br/>Questioning layer"]
-    SKILL --> MCP["15+ MCP Tools<br/>Create, Read, Update,<br/>Upload, Notify, Stats,<br/>Context, Programs"]
+    SKILL --> SOP5["SOP-5: Pre-Hunt Q&A<br/>Questioning layer"]
+    SKILL --> MCP["30+ MCP Tools<br/>Findings, Observations,<br/>Hypotheses, Evidence,<br/>Assets, Endpoints,<br/>Recon, Programs"]
     SKILL --> REFS["Reference Library"]
-    REFS --> ORCH[bb-orchestrator.md<br/>Routing & coordination]
-    REFS --> OP[bb-operator.md<br/>Hunting methodology]
-    REFS --> RECON[bb-recon.md<br/>Recon playbook]
-    REFS --> VULNS[bb-eligible-vulnerabilities.md<br/>Vulnerability taxonomy]
-    REFS --> STD[bb-standards.md<br/>Scope & platform rules]
-    REFS --> TEMPLATES[bb-report-templates.md<br/>Ready-to-fill templates]
+    REFS --> ORCH[bb-orchestrator.md]
+    REFS --> OP[bb-operator.md]
+    REFS --> RECON[bb-recon.md]
+    REFS --> VULNS[bb-eligible-vulnerabilities.md]
+    REFS --> STD[bb-standards.md]
+    REFS --> TEMPLATES[bb-report-templates.md]
 
     style C fill:#4a9,color:#fff
     style SKILL fill:#67b,color:#fff
@@ -94,7 +114,7 @@ graph TB
     style REFS fill:#567,color:#fff
 ```
 
-**~1,500 lines of bug bounty knowledge** — every session. The reference library is lazy-loaded (you only pull what you need), but the core skill & tools are always there.
+**~2,000 lines of bug bounty knowledge** — every session. The reference library is lazy-loaded (you only pull what you need), but the core skill & tools are always there.
 
 ---
 
@@ -188,16 +208,16 @@ cp -r skills/bb-huge ~/.gemini/skills/
 
 Now every time you type `/bb-huge`, the agent loads:
 - Senior Bug Hunter persona with capture-first discipline
-- 5 Standard Operating Procedures (SOP-1 through SOP-5)
-- Full severity & status reference
-- 6 reference files (600+ lines of methodology)
-- 15+ MCP tools wired to your portal
+- 6 Standard Operating Procedures (SOP-0 through SOP-5)
+- Full tool reference & severity/status guides
+- 6 reference files covering methodology, recon, scope, reports
+- 30+ MCP tools wired to your portal
 
 **The agent doesn't just "know about" bug bounty. It becomes a bug bounty hunter.**
 
 #### ✅ Expected response when loading
 
-After typing `/bb-huge`, the agent will acknowledge the injected methodology and prep the session. 
+After typing `/bb-huge`, the agent will acknowledge the injected methodology and prep the session.
 
 <table>
   <tr>
@@ -207,15 +227,14 @@ After typing `/bb-huge`, the agent will acknowledge the injected methodology and
   <tr>
     <td valign="top">
 <pre>
-🔵 bb-huge skill loaded 
+🔵 bb-huge skill loaded
 — Senior Bug Hunter mode active
-📊 Portal: 42 findings, 5 programs
+📊 Portal: 42 findings, 5 programs, 3 open observations
 🔄 Resuming last session: finding #17
 ❓ What target are we working on today?
 </pre>
     </td>
     <td valign="top">
-      <!-- Replace the src with your actual image URL -->
       <img src="/assets/images/OPENCODE_TODS_SOPs.png" alt="Agent mapping SOPs as a todo list" width="100%">
     </td>
   </tr>
@@ -298,7 +317,7 @@ bb_upload_attachment(id=42, file_path="./burp_request.txt")
 python skills/bb-huge/scripts/bb-dump-attachments.py 42
 ```
 
-Both scripts pull auth from environment variables (`BB_HUGE_URL`, `DEV_KEY`). No credentials hardcoded. Ever.
+Both scripts pull auth from environment variables (`BB_HUGE_URL`, `DEV_KEY`). No credentials hardcoded.
 
 </details>
 
@@ -307,10 +326,11 @@ Both scripts pull auth from environment variables (`BB_HUGE_URL`, `DEV_KEY`). No
 
 SOP-3 handles this. The agent:
 
-1. `bb_get_finding(42)` — reads current state
-2. `python scripts/bb-dump-attachments.py 42` — pulls all evidence to local disk
-3. Reads every attachment to restore full context
-4. Gives you a one-paragraph summary of where things stand before you continue
+1. `bb_get_finding(42)` — reads current state, linked hypothesis & evidence
+2. `bb_generate_report_context(42)` — gets evidence summary, unresolved gaps
+3. `python scripts/bb-dump-attachments.py 42` — pulls all attachments to local disk
+4. Reads every attachment to restore full context
+5. Gives you a one-paragraph summary of where things stand
 
 Zero context loss between sessions. Even between different agents.
 
@@ -338,8 +358,10 @@ Programs are first-class citizens. Each program tracks:
 
 - Platform (HackerOne, Bugcrowd, Intigriti, private)
 - Scope rules (in-scope / out-of-scope)
-- Findings linked to it
-- Recon entries (subdomains, endpoints, technologies, parameters)
+- Findings, observations, hypotheses linked to it
+- Assets (domains, subdomains, API hosts, mobile apps, repos)
+- Endpoints (URL paths with method, protocol, auth info)
+- Recon entries (subdomains, technologies, parameters, credentials)
 
 ```bash
 bb_create_program(name="Acme Corp", platform="HackerOne")
@@ -355,28 +377,78 @@ bb_list_programs()
 All endpoints require `X-Dev-Key` header.
 
 ```
+# Stats
 GET    /api/v1/stats
+
+# Enums
+GET    /api/v1/enums
+
+# Findings
 GET    /api/v1/findings?q=&severity=&status=&agent=&limit=&offset=
 POST   /api/v1/findings
 GET    /api/v1/findings/<id>
 PATCH  /api/v1/findings/<id>
-PATCH  /api/v1/findings/<id>/status
 DELETE /api/v1/findings/<id>
+PATCH  /api/v1/findings/<id>/status
+POST   /api/v1/findings/<id>/notes
+DELETE /api/v1/notes/<id>
+POST   /api/v1/findings/<id>/attachments
+GET    /api/v1/findings/<id>/report-pack
 GET    /api/v1/findings/similar?target=&cwe=&title=
+PATCH  /api/v1/findings/bulk/status
+
+# Programs
 GET    /api/v1/programs
 POST   /api/v1/programs
 GET    /api/v1/programs/<id>
 PATCH  /api/v1/programs/<id>
-GET    /api/v1/programs/<id>/context       # Pre-hunt Q&A data
-PUT    /api/v1/programs/<id>/context       # Save pre-hunt Q&A data
+DELETE /api/v1/programs/<id>
+GET    /api/v1/programs/<id>/context
+PUT    /api/v1/programs/<id>/context
+GET    /api/v1/programs/<id>/brief
+
+# Recon
 GET    /api/v1/programs/<id>/recon
 POST   /api/v1/programs/<id>/recon
 DELETE /api/v1/recon/<id>
-POST   /api/v1/findings/<id>/notes
-DELETE /api/v1/notes/<id>
-PATCH  /api/v1/findings/bulk/status
+
+# Observations
+GET    /api/v1/programs/<id>/observations
+POST   /api/v1/programs/<id>/observations
+GET    /api/v1/observations/<id>
+PATCH  /api/v1/observations/<id>
+POST   /api/v1/observations/<id>/promote
+
+# Hypotheses
+GET    /api/v1/programs/<id>/hypotheses
+POST   /api/v1/programs/<id>/hypotheses
+GET    /api/v1/hypotheses/<id>
+PATCH  /api/v1/hypotheses/<id>
+POST   /api/v1/hypotheses/<id>/promote
+
+# Evidence
+GET    /api/v1/programs/<id>/evidence
+POST   /api/v1/evidence
+GET    /api/v1/evidence/<id>
+PATCH  /api/v1/evidence/<id>
+
+# Assets
+GET    /api/v1/programs/<id>/assets
+POST   /api/v1/programs/<id>/assets
+PATCH  /api/v1/assets/<id>
+DELETE /api/v1/assets/<id>
+
+# Endpoints
+GET    /api/v1/assets/<id>/endpoints
+POST   /api/v1/assets/<id>/endpoints
+PATCH  /api/v1/endpoints/<id>
+DELETE /api/v1/endpoints/<id>
+
+# Notifications
 POST   /api/v1/notify
-GET    /api/v1/enums
+
+# Similarity check
+POST   /api/v1/similarity/check
 ```
 
 Example:
@@ -433,39 +505,46 @@ That's the whole command. The `Dockerfile` + `docker-compose.yml` handle the res
 ```
 bb-huge/
 ├── app/
-│   ├── __init__.py            # Flask app factory
-│   ├── models.py              # 7 models: Finding, Attachment, Program,
-│   │                          #   ReconEntry, Note, WebhookConfig, TargetContext
+│   ├── __init__.py              # Flask app factory
+│   ├── models.py                # 11 models: Finding, Attachment, Program,
+│   │                            #   ReconEntry, Note, WebhookConfig,
+│   │                            #   TargetContext, Observation, Hypothesis,
+│   │                            #   EvidenceRecord, Asset, Endpoint
+│   ├── migrations.py            # Schema migration functions
 │   ├── routes/
-│   │   ├── auth.py            # Login / logout
-│   │   ├── findings.py        # Web UI: CRUD, upload, CSV export
-│   │   ├── api.py             # REST API v1 (full CRUD + extras)
-│   │   ├── programs.py        # Program management
-│   │   └── settings.py        # Webhooks, notes
-│   ├── utils.py               # File validation, webhook dispatch
-│   ├── templates/             # 11 Jinja2 templates (dark theme)
-│   └── static/uploads/        # Attachment storage
+│   │   ├── auth.py              # Login / logout
+│   │   ├── findings.py          # Web UI: CRUD, upload, CSV, report-pack
+│   │   ├── api.py               # REST API (45+ endpoints)
+│   │   ├── programs.py          # Program management + observations,
+│   │   │                        #   hypotheses, evidence, assets, recon
+│   │   └── settings.py          # Webhooks, notes
+│   ├── utils.py                 # File validation, webhook dispatch
+│   ├── templates/               # 11+ Jinja2 templates (dark theme)
+│   └── static/uploads/          # Attachment storage
 ├── skills/bb-huge/
-│   ├── SKILL.md               # The brain — 264 lines of agent instruction
+│   ├── SKILL.md                 # The brain — agent instruction
 │   ├── references/
-│   │   ├── bb-orchestrator.md         # Multi-skill routing & coordination
-│   │   ├── bb-operator.md             # Full hunting methodology
-│   │   ├── bb-recon.md                # Recon playbook + tool commands
+│   │   ├── bb-orchestrator.md           # Multi-skill routing & coordination
+│   │   ├── bb-operator.md               # Full hunting methodology
+│   │   ├── bb-recon.md                  # Recon playbook + tool commands
 │   │   ├── bb-eligible-vulnerabilities.md  # Vulnerability taxonomy & CWE ref
-│   │   ├── bb-standards.md            # Scope rules, platform policies
-│   │   └── bb-report-templates.md     # 5 ready-to-fill report templates
+│   │   ├── bb-standards.md              # Scope rules, platform policies
+│   │   └── bb-report-templates.md       # Report templates & prep checklist
 │   └── scripts/
-│       ├── bb.py                      # CLI helper (stats/list/get/create/status)
-│       ├── bb-dump-attachments.py     # Download all evidence for a finding
-│       └── bb-orchestrator-list-skills.py  # Print available skill roster
-├── mcp_server.py              # MCP stdio server (15+ tools)
-├── THEORY_QUIZ.md             # 10-question agent comprehension test
-├── config.py                  # App configuration
-├── run.py                     # Entry point (Flask / Waitress)
+│       ├── bb.py                        # CLI helper
+│       ├── bb-dump-attachments.py       # Download all evidence
+│       └── bb-orchestrator-list-skills.py  # List available skills
+├── mcp_server.py                # MCP stdio server (30+ tools)
+├── THEORY_QUIZ.md               # 10-question agent comprehension test
+├── tests/
+│   └── test_api.py              # API integration tests
+├── config.py                    # App configuration
+├── run.py                       # Entry point (Flask / Waitress)
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
-└── .env.example
+├── .env.example
+└── mcp_config_examples.txt
 ```
 
 ---

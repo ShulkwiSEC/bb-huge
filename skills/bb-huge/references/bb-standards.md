@@ -102,6 +102,30 @@ What makes a finding report-ready:
 | poc | Steps to reproduce | Working payload + screenshot/recording |
 | cwe | Optional | Always fill if known |
 | attachments | At least one | Burp export + screenshot |
+| evidence_records | None | Structured HTTP pairs via `bb_attach_http_pair()` |
+
+### Structured Evidence
+
+Prefer `bb_attach_http_pair()` over raw file attachments for HTTP-based
+evidence. Structured evidence is:
+
+- **Searchable** — future agents can read it without downloading files
+- **Portable** — follows the record through promotion (observation→hypothesis→finding)
+- **Self-documenting** — includes method, URL, headers, status code, and body
+
+Use `bb_upload_attachment()` for visual/binaries: screenshots, Burp project
+files, script outputs, or videos.
+
+### Non-Finding Record Quality
+
+Observations and hypotheses have lighter standards but still deserve care:
+
+| Field | Observation | Hypothesis |
+|-------|-------------|------------|
+| title | Required — describe the odd behavior | Required — state the suspected vuln |
+| summary | Required — what happened? | Use `attack_path` field instead |
+| category | Required — which domain? | Use `weakness_hint` and `cwe` |
+| confidence | Required — "low" if unsure | "medium" or "high" |
 
 ---
 

@@ -4,7 +4,7 @@
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <style>
-  /* ── hero header ── */
+  /* ─── Hero ──────────────────────────────────────────────── */
   .prog-hero { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
   .prog-hero-banner {
     height: 70px;
@@ -40,10 +40,10 @@
   .prog-title-block { flex: 1; min-width: 0; padding-top: 6px; }
   .prog-name { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
   .prog-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .prog-url  { font-size: 12px; color: var(--accent2); text-decoration: none; }
+  .prog-url { font-size: 12px; color: var(--accent2); text-decoration: none; }
   .prog-url:hover { text-decoration: underline; }
   .prog-stats-strip {
-    display: grid; grid-template-columns: repeat(4, 1fr);
+    display: grid; grid-template-columns: repeat(5, 1fr);
     border-top: 1px solid var(--border);
   }
   .pstat { padding: 10px 0; text-align: center; border-right: 1px solid var(--border); }
@@ -51,13 +51,14 @@
   .pstat-val { font-family: var(--mono); font-size: 18px; font-weight: 700; line-height: 1; }
   .pstat-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-top: 3px; }
 
-  /* ── tabs ── */
-  .tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:20px; }
+  /* ─── Tabs ───────────────────────────────────────────────── */
+  .tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:20px; overflow:auto; }
   .tab-btn {
     padding:10px 18px; font-size:13px; font-weight:500;
     background:none; border:none; color:var(--muted);
     cursor:pointer; border-bottom:2px solid transparent;
     margin-bottom:-1px; transition:all .15s; font-family:var(--sans);
+    white-space:nowrap;
   }
   .tab-btn:hover { color:var(--text); }
   .tab-btn.active { color:var(--accent2); border-bottom-color:var(--accent2); }
@@ -68,19 +69,21 @@
     color:var(--accent2); padding:1px 6px; border-radius:4px; font-size:11px;
   }
 
-  /* ── findings table ── */
   .finding-link { color:var(--text); text-decoration:none; font-weight:500; }
   .finding-link:hover { color:var(--accent2); }
 
-  /* ── recon ── */
-  .recon-section { margin-bottom:24px; }
-  .recon-category-title {
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:900px){ .grid-2 { grid-template-columns:1fr; } }
+
+  .recon-section, .stack-section { margin-bottom:24px; }
+  .stack-title {
     font-size:11px; font-weight:700; color:var(--muted);
-    text-transform:uppercase; letter-spacing:.5px;
-    margin-bottom:8px; display:flex; align-items:center; gap:8px;
+    text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;
+    display:flex; align-items:center; gap:8px;
   }
-  .recon-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px; }
-  .recon-chip {
+
+  .recon-chips, .chip-list { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px; }
+  .recon-chip, .brief-chip {
     font-family:var(--mono); font-size:12px;
     background:var(--bg3); border:1px solid var(--border);
     border-radius:6px; padding:4px 10px;
@@ -89,43 +92,280 @@
   .recon-chip .chip-source { color:var(--muted); font-size:10px; }
   .recon-chip .chip-del {
     color:var(--muted); cursor:pointer; background:none;
-    border:none; padding:0; line-height:1; font-size:12px;
-    margin-left:2px;
+    border:none; padding:0; line-height:1; font-size:12px; margin-left:2px;
   }
   .recon-chip .chip-del:hover { color:var(--critical); }
 
-  /* ── add recon inline form ── */
-  .add-recon-form {
+  .inline-form {
     background:var(--bg3); border:1px solid var(--border);
     border-radius:8px; padding:14px 16px; margin-top:14px;
   }
-  .add-recon-form .form-row {
+  .inline-form .form-row {
     display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;
   }
-  .add-recon-form input, .add-recon-form select { padding:7px 10px; font-size:13px; }
-  .add-recon-form .f-val { flex:1; min-width:200px; }
-  .add-recon-form .f-cat { width:140px; }
-  .add-recon-form .f-src { width:130px; }
-  .add-recon-form .f-notes { width:100%; margin-top:8px; }
+  .inline-form .form-row > * { flex: 1; min-width: 140px; }
+  .inline-form .form-row .btn { flex: 0 0 auto; }
+  .inline-form textarea { resize:vertical; min-height:88px; }
 
-  /* ── scope section ── */
   .scope-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
   @media(max-width:700px){ .scope-grid { grid-template-columns:1fr; } }
-  .scope-box { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
-  .scope-box-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px; }
-  .scope-box.in-scope   { border-color:rgba(6,214,160,.25); }
-  .scope-box.out-scope  { border-color:rgba(255,77,109,.2); }
+  .scope-box, .brief-box, .timeline-entry, .evidence-card, .obs-card, .hyp-card {
+    background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:14px 16px;
+  }
+  .scope-box-title, .brief-label {
+    font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px;
+  }
+  .scope-box.in-scope { border-color:rgba(6,214,160,.25); }
+  .scope-box.out-scope { border-color:rgba(255,77,109,.2); }
 
-  /* ── danger zone ── */
+  .stack-list { display:grid; gap:10px; }
+  .meta-line { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
+  .tiny { font-size:11px; color:var(--muted); }
+  .mono-tiny { font-size:11px; color:var(--muted); font-family:var(--mono); }
+  .muted-box {
+    background:rgba(255,255,255,.02);
+    border:1px dashed var(--border2);
+    border-radius:8px; padding:16px;
+  }
+
+  .evidence-card pre, .timeline-entry pre {
+    white-space:pre-wrap; overflow-wrap:anywhere; margin-top:10px;
+    background:rgba(0,0,0,.18); border:1px solid var(--border); border-radius:8px; padding:12px;
+  }
   .danger-zone { border:1px solid rgba(255,77,109,.2); border-radius:10px; padding:16px 20px; margin-top:24px; }
   .danger-zone h3 { font-size:13px; color:var(--critical); margin-bottom:10px; }
+
+  /* ─── Brief Tab — redesigned ─────────────────────────────── */
+  .brief-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .brief-layout { grid-template-columns: 1fr; }
+  }
+
+  /* Panel card */
+  .brief-panel {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .brief-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,.02);
+  }
+  .brief-panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .55px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .brief-panel-title svg { opacity: .55; flex-shrink: 0; }
+  .brief-panel-body { padding: 14px; }
+
+  /* Saved context */
+  .ctx-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 28px 16px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+  .ctx-empty svg { opacity: .3; }
+  .ctx-code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: rgba(0,0,0,.22);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 12px;
+    max-height: 220px;
+    overflow-y: auto;
+    color: var(--text);
+  }
+  .ctx-code::-webkit-scrollbar { width: 4px; }
+  .ctx-code::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Hotspots */
+  .hotspot-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 500px) { .hotspot-cols { grid-template-columns: 1fr; } }
+
+  .hotspot-group-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    margin-bottom: 8px;
+  }
+  .hotspot-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(124,106,255,.06);
+    border: 1px solid rgba(124,106,255,.14);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 5px;
+    gap: 8px;
+  }
+  .hotspot-pill:last-child { margin-bottom: 0; }
+  .hotspot-pill-name {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hotspot-pill-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent2);
+    flex-shrink: 0;
+    background: rgba(124,106,255,.15);
+    padding: 1px 7px;
+    border-radius: 4px;
+  }
+  .hotspot-empty { font-size: 11px; color: var(--muted); padding: 4px 0; }
+
+  /* Signals column */
+  .signals-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .sig-tab {
+    flex: 1;
+    padding: 10px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: color .13s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: -1px;
+  }
+  .sig-tab:hover { color: var(--text); }
+  .sig-tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+  .sig-tab .sig-count {
+    background: rgba(124,106,255,.15);
+    color: var(--accent2);
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .sig-panel { display: none; padding: 12px 14px; }
+  .sig-panel.active { display: block; }
+
+  /* Signal cards */
+  .sig-card {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .sig-card:last-child { border-bottom: none; padding-bottom: 0; }
+  .sig-card:first-child { padding-top: 0; }
+
+  .sig-accent-bar {
+    width: 3px;
+    min-height: 36px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .sig-accent-bar.obs  { background: #6bbcff; }
+  .sig-accent-bar.hyp  { background: #ffd166; }
+
+  .sig-body { flex: 1; min-width: 0; }
+  .sig-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.35;
+    margin-bottom: 5px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .sig-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .sig-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .sig-badge.cat  { background: rgba(107,188,255,.12); color: #6bbcff; border: 1px solid rgba(107,188,255,.2); }
+  .sig-badge.stat { background: rgba(255,255,255,.06); color: var(--muted); border: 1px solid var(--border); }
+  .sig-badge.sev-critical { background: rgba(255,77,109,.12); color: #ff4d6d; border: 1px solid rgba(255,77,109,.2); }
+  .sig-badge.sev-high     { background: rgba(255,152,0,.12); color: #ff9800; border: 1px solid rgba(255,152,0,.2); }
+  .sig-badge.sev-medium   { background: rgba(255,209,102,.12); color: #ffd166; border: 1px solid rgba(255,209,102,.2); }
+  .sig-badge.sev-low      { background: rgba(6,214,160,.12); color: #06d6a0; border: 1px solid rgba(6,214,160,.2); }
+  .sig-badge.cwe  { background: rgba(124,106,255,.12); color: var(--accent2); border: 1px solid rgba(124,106,255,.2); font-family: var(--mono); }
+  .sig-agent {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: auto;
+    flex-shrink: 0;
+    padding-left: 4px;
+  }
+
+  .sig-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 24px 12px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+  .sig-empty svg { opacity: .3; }
+
+  /* Briefs grid — legacy keep (used in other tabs) */
+  .brief-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:16px; }
+  @media(max-width:900px){ .brief-grid { grid-template-columns:1fr; } }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
-
-  <!-- Hero Header -->
   {% set s = program.stats() %}
   <div class="prog-hero">
     <div class="prog-hero-banner">
@@ -158,35 +398,186 @@
     </div>
 
     <div class="prog-stats-strip">
-      <div class="pstat"><div class="pstat-val" style="color:var(--accent2)">{{ s.total }}</div><div class="pstat-label">Total</div></div>
-      <div class="pstat"><div class="pstat-val" style="color:var(--critical)">{{ s.by_severity.critical }}</div><div class="pstat-label">Critical</div></div>
-      <div class="pstat"><div class="pstat-val" style="color:var(--high)">{{ s.by_severity.high }}</div><div class="pstat-label">High</div></div>
-      <div class="pstat"><div class="pstat-val" style="color:#00ffb3">{{ s.by_status.rewarded }}</div><div class="pstat-label">Rewarded</div></div>
+      <div class="pstat"><div class="pstat-val" style="color:var(--accent2)">{{ s.total }}</div><div class="pstat-label">Findings</div></div>
+      <div class="pstat"><div class="pstat-val" style="color:#6bbcff">{{ observations|length }}</div><div class="pstat-label">Observations</div></div>
+      <div class="pstat"><div class="pstat-val" style="color:#ffd166">{{ hypotheses|length }}</div><div class="pstat-label">Hypotheses</div></div>
+      <div class="pstat"><div class="pstat-val" style="color:#00ffb3">{{ evidence_records|length }}</div><div class="pstat-label">Evidence</div></div>
+      <div class="pstat"><div class="pstat-val" style="color:#8a7aff">{{ assets|length }}</div><div class="pstat-label">Assets</div></div>
     </div>
   </div>
 
-  <!-- Tabs -->
   <div class="card">
     <div class="tabs">
-      <button class="tab-btn active" onclick="showTab('findings',this)">
-        Findings<span class="tab-count">{{ findings|length }}</span>
-      </button>
-      <button class="tab-btn" onclick="showTab('recon',this)">
-        Recon<span class="tab-count">{{ program.recon|length }}</span>
-      </button>
+      <button class="tab-btn active" onclick="showTab('brief',this)" id="brief-tab-btn">Brief</button>
+      <button class="tab-btn" onclick="showTab('findings',this)">Findings<span class="tab-count">{{ findings|length }}</span></button>
+      <button class="tab-btn" onclick="showTab('assets',this)" id="assets-tab-btn">Assets<span class="tab-count">{{ assets|length }}</span></button>
+      <button class="tab-btn" onclick="showTab('observations',this)" id="observations-tab-btn">Observations<span class="tab-count">{{ observations|length }}</span></button>
+      <button class="tab-btn" onclick="showTab('hypotheses',this)" id="hypotheses-tab-btn">Hypotheses<span class="tab-count">{{ hypotheses|length }}</span></button>
+      <button class="tab-btn" onclick="showTab('evidence',this)" id="evidence-tab-btn">Evidence<span class="tab-count">{{ evidence_records|length }}</span></button>
+      <button class="tab-btn" onclick="showTab('recon',this)" id="recon-tab-btn">Recon<span class="tab-count">{{ program.recon|length }}</span></button>
       <button class="tab-btn" onclick="showTab('scope',this)">Scope</button>
       <button class="tab-btn" onclick="showTab('notes',this)">Notes</button>
     </div>
 
-    <!-- Findings tab -->
-    <div id="tab-findings" class="tab-panel active">
+    <!-- ═══════════════════════════════════════════════════════
+         BRIEF TAB — redesigned
+    ════════════════════════════════════════════════════════ -->
+    <div id="tab-brief" class="tab-panel active">
+      <div class="brief-layout">
+
+        <!-- LEFT COLUMN -->
+        <div style="display:grid;gap:14px;">
+
+          <!-- Saved Context -->
+          <div class="brief-panel">
+            <div class="brief-panel-head">
+              <div class="brief-panel-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+                Saved Context
+              </div>
+            </div>
+            <div class="brief-panel-body" style="padding:0">
+              {% if target_context and target_context.data %}
+                <div class="ctx-code">{{ target_context.data | tojson(indent=2) }}</div>
+              {% else %}
+                <div class="ctx-empty">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+                  No saved target context yet
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Duplicate Hotspots -->
+          <div class="brief-panel">
+            <div class="brief-panel-head">
+              <div class="brief-panel-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                Duplicate Hotspots
+              </div>
+            </div>
+            <div class="brief-panel-body">
+              <div class="hotspot-cols">
+                <div>
+                  <div class="hotspot-group-label">By CWE</div>
+                  {% if duplicate_hotspots.by_cwe %}
+                    {% for cwe, count in duplicate_hotspots.by_cwe %}
+                      <div class="hotspot-pill">
+                        <span class="hotspot-pill-name">{{ cwe }}</span>
+                        <span class="hotspot-pill-count">{{ count }}</span>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <div class="hotspot-empty">No CWE hotspots yet</div>
+                  {% endif %}
+                </div>
+                <div>
+                  <div class="hotspot-group-label">By Target</div>
+                  {% if duplicate_hotspots.by_target %}
+                    {% for target, count in duplicate_hotspots.by_target %}
+                      <div class="hotspot-pill">
+                        <span class="hotspot-pill-name">{{ target }}</span>
+                        <span class="hotspot-pill-count">{{ count }}</span>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <div class="hotspot-empty">No target hotspots yet</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /left column -->
+
+        <!-- RIGHT COLUMN — Recent Signals -->
+        <div class="brief-panel" style="min-width:0">
+          <div class="brief-panel-head">
+            <div class="brief-panel-title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Recent Signals
+            </div>
+          </div>
+
+          <div class="signals-tabs">
+            <button class="sig-tab active" onclick="showSigTab('obs',this)">
+              Observations
+              <span class="sig-count">{{ observations|length }}</span>
+            </button>
+            <button class="sig-tab" onclick="showSigTab('hyp',this)">
+              Hypotheses
+              <span class="sig-count">{{ hypotheses|length }}</span>
+            </button>
+          </div>
+
+          <!-- Observations panel -->
+          <div id="sig-obs" class="sig-panel active">
+            {% if observations %}
+              {% for observation in observations[:5] %}
+                <div class="sig-card">
+                  <div class="sig-accent-bar obs"></div>
+                  <div class="sig-body">
+                    <div class="sig-title">{{ observation.title }}</div>
+                    <div class="sig-meta">
+                      <span class="sig-badge cat">{{ observation.category }}</span>
+                      <span class="sig-badge stat">{{ observation.status }}</span>
+                      <span class="sig-agent">{{ observation.agent }}</span>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="sig-empty">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                No observations yet
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Hypotheses panel -->
+          <div id="sig-hyp" class="sig-panel">
+            {% if hypotheses %}
+              {% for hypothesis in hypotheses[:5] %}
+                <div class="sig-card">
+                  <div class="sig-accent-bar hyp"></div>
+                  <div class="sig-body">
+                    <div class="sig-title">{{ hypothesis.title }}</div>
+                    <div class="sig-meta">
+                      {% if hypothesis.severity_hint %}
+                        <span class="sig-badge sev-{{ hypothesis.severity_hint }}">{{ hypothesis.severity_hint }}</span>
+                      {% endif %}
+                      {% if hypothesis.cwe %}
+                        <span class="sig-badge cwe">{{ hypothesis.cwe }}</span>
+                      {% endif %}
+                      <span class="sig-badge stat">{{ hypothesis.status }}</span>
+                      <span class="sig-agent">{{ hypothesis.agent }}</span>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="sig-empty">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                No hypotheses yet
+              </div>
+            {% endif %}
+          </div>
+
+        </div><!-- /right column -->
+      </div><!-- /brief-layout -->
+    </div><!-- /tab-brief -->
+
+
+    <!-- ═══════════════════════════════════════════════════════
+         FINDINGS TAB — unchanged
+    ════════════════════════════════════════════════════════ -->
+    <div id="tab-findings" class="tab-panel">
       {% if findings %}
       <div style="overflow-x:auto">
         <table>
           <thead>
             <tr>
-              <th>#</th><th>Title</th><th>Severity</th>
-              <th>CVSS</th><th>Status</th><th>Agent</th><th>Date</th>
+              <th>#</th><th>Title</th><th>Severity</th><th>CVSS</th><th>Status</th><th>Agent</th><th>Date</th>
             </tr>
           </thead>
           <tbody>
@@ -195,18 +586,13 @@
               <td class="mono text-muted" style="font-size:11px">{{ f.id }}</td>
               <td>
                 <a href="{{ url_for('findings.detail', fid=f.id) }}" class="finding-link">{{ f.title }}</a>
-                {% if f.tags %}
-                  {% for tag in f.tags %}
-                  <span style="font-size:10px;background:rgba(124,106,255,.1);color:var(--accent2);padding:1px 5px;border-radius:3px;margin-left:3px">{{ tag }}</span>
-                  {% endfor %}
+                {% if f.hypothesis %}
+                  <div class="tiny">linked hypothesis #{{ f.hypothesis.id }}</div>
                 {% endif %}
               </td>
               <td><span class="badge badge-{{ f.severity }}">{{ f.severity }}</span></td>
               <td class="mono" style="font-size:12px">{{ "%.1f"|format(f.cvss) if f.cvss else '—' }}</td>
-              <td>
-                {% set sc = f.status.replace('/','').replace('-','') %}
-                <span class="badge badge-{{ sc }}">{{ f.status }}</span>
-              </td>
+              <td>{% set sc = f.status.replace('/','').replace('-','') %}<span class="badge badge-{{ sc }}">{{ f.status }}</span></td>
               <td class="text-muted mono" style="font-size:11px">{{ f.agent }}</td>
               <td class="text-muted" style="font-size:12px">{{ f.created_at.strftime('%Y-%m-%d') if f.created_at }}</td>
             </tr>
@@ -215,20 +601,293 @@
         </table>
       </div>
       {% else %}
-        <div style="text-align:center;padding:40px;color:var(--muted)">
-          No findings yet.
-          <a href="{{ url_for('findings.add_finding') }}?program_id={{ program.id }}" style="color:var(--accent2)">Add the first one →</a>
-        </div>
+        <div class="muted-box">No findings yet. <a href="{{ url_for('findings.add_finding') }}?program_id={{ program.id }}" style="color:var(--accent2)">Add the first one →</a></div>
       {% endif %}
     </div>
 
-    <!-- Recon tab -->
+
+    <!-- ═══════════════════════════════════════════════════════
+         ASSETS TAB
+    ════════════════════════════════════════════════════════ -->
+    <div id="tab-assets" class="tab-panel">
+      {% if assets %}
+        {% for asset in assets %}
+          <div class="obs-card" style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+              <div>
+                <div style="font-weight:600">
+                  <span class="badge badge-informational">{{ asset.kind }}</span>
+                  {{ asset.identifier }}
+                </div>
+                {% if asset.notes %}<div class="tiny" style="margin-top:6px">{{ asset.notes }}</div>{% endif %}
+              </div>
+              <div class="meta-line">
+                <span class="brief-chip">{{ asset.environment }}</span>
+                {% if not asset.active %}<span class="brief-chip" style="color:var(--critical)">inactive</span>{% endif %}
+                <span class="mono-tiny">#{{ asset.id }}</span>
+              </div>
+            </div>
+            <div class="meta-line">
+              <span class="tiny">created {{ asset.created_at.strftime('%Y-%m-%d') if asset.created_at }}</span>
+            </div>
+
+            <!-- Endpoints for this asset -->
+            <div style="margin-top:10px">
+              {% if asset.endpoints %}
+                <div style="display:grid;gap:4px">
+                  {% for ep in asset.endpoints %}
+                    <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;font-family:var(--mono)">
+                      <span class="brief-chip" style="font-size:10px">{{ ep.method }}</span>
+                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ep.path }}</span>
+                      <span class="tiny">{{ ep.protocol }}</span>
+                      {% if ep.content_type %}<span class="tiny">{{ ep.content_type }}</span>{% endif %}
+                      {% if ep.auth_required is not none %}<span class="tiny">{{ 'auth' if ep.auth_required else 'public' }}</span>{% endif %}
+                      {% if ep.discovered_by %}<span class="tiny">via {{ ep.discovered_by }}</span>{% endif %}
+                      <form method="POST" action="{{ url_for('programs.delete_endpoint', eid=ep.id) }}" style="display:inline" onsubmit="return confirm('Delete endpoint?')">
+                        <button type="submit" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px" title="Delete endpoint">✕</button>
+                      </form>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <!-- Add endpoint form -->
+              <details style="margin-top:6px">
+                <summary style="font-size:11px;color:var(--muted);cursor:pointer">+ Add endpoint</summary>
+                <form method="POST" action="{{ url_for('programs.add_endpoint', aid=asset.id) }}" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center">
+                  <select name="method" style="font-size:11px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+                    <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+                  </select>
+                  <input type="text" name="path" placeholder="/api/path" required style="flex:1;min-width:120px;font-size:11px;padding:3px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+                  <select name="protocol" style="font-size:11px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+                    {% for p in endpoint_protocols %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+                  </select>
+                  <input type="text" name="content_type" placeholder="content-type" style="font-size:11px;padding:3px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+                  <label style="font-size:11px;color:var(--muted)"><input type="checkbox" name="auth_required"> Auth</label>
+                  <input type="text" name="discovered_by" placeholder="tool" style="font-size:11px;padding:3px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+                  <button type="submit" class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 8px">Add</button>
+                </form>
+              </details>
+            </div>
+
+            <div class="meta-line" style="margin-top:8px">
+              <form method="POST" action="{{ url_for('programs.delete_asset', aid=asset.id) }}" onsubmit="return confirm('Delete asset and all its endpoints?')">
+                <button type="submit" class="btn btn-danger btn-sm" style="font-size:10px">Delete</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="muted-box">No assets tracked yet.</div>
+      {% endif %}
+
+      <!-- Add Asset form -->
+      <div class="inline-form">
+        <div class="brief-label">+ Add Asset</div>
+        <form method="POST" action="{{ url_for('programs.add_asset', pid=program.id) }}">
+          <div class="form-row">
+            <div><label>Kind</label><select name="kind">{% for k in asset_kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}</select></div>
+            <div style="flex:2"><label>Identifier (domain / URL)</label><input type="text" name="identifier" required></div>
+            <div><label>Environment</label><select name="environment">{% for e in asset_environments %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select></div>
+            <div><label>Active?</label><select name="active"><option value="on">Yes</option><option value="">No</option></select></div>
+            <button type="submit" class="btn btn-primary btn-sm">Add</button>
+          </div>
+          <div class="form-group mt-4"><label>Notes</label><textarea name="notes"></textarea></div>
+        </form>
+      </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════════
+         OBSERVATIONS TAB — unchanged
+    ════════════════════════════════════════════════════════ -->
+    <div id="tab-observations" class="tab-panel">
+      <div class="stack-list">
+        {% if observations %}
+          {% for observation in observations %}
+            <div class="obs-card">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+                <div>
+                  <div style="font-weight:600">{{ observation.title }}</div>
+                  {% if observation.summary %}<div class="tiny" style="margin-top:6px">{{ observation.summary }}</div>{% endif %}
+                </div>
+                <div class="meta-line">
+                  <span class="badge badge-informational">{{ observation.category }}</span>
+                  <span class="brief-chip">{{ observation.confidence }}</span>
+                  <span class="mono-tiny">{{ observation.status }}</span>
+                </div>
+              </div>
+              <div class="meta-line">
+                <span class="mono-tiny">{{ observation.agent }}</span>
+                {% if observation.source_tool %}<span class="tiny">source: {{ observation.source_tool }}</span>{% endif %}
+                <span class="tiny">{{ observation.updated_at.strftime('%Y-%m-%d %H:%M') if observation.updated_at }}</span>
+              </div>
+              <div class="meta-line" style="margin-top:10px">
+                <form method="POST" action="{{ url_for('programs.promote_observation', oid=observation.id) }}">
+                  <button type="submit" class="btn btn-primary btn-sm">Promote → Hypothesis</button>
+                </form>
+                <form method="POST" action="{{ url_for('programs.delete_observation', oid=observation.id) }}" onsubmit="return confirm('Delete observation?')">
+                  <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="muted-box">No observations logged yet.</div>
+        {% endif %}
+      </div>
+
+      <div class="inline-form">
+        <div class="brief-label">+ Add Observation</div>
+        <form method="POST" action="{{ url_for('programs.add_observation', pid=program.id) }}">
+          <div class="form-row">
+            <div><label>Title</label><input type="text" name="title" required></div>
+            <div><label>Category</label><select name="category">{% for c in observation_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></div>
+            <div><label>Status</label><select name="status">{% for s in observation_statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+            <div><label>Confidence</label><select name="confidence">{% for c in confidence_levels %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></div>
+            <div><label>Agent</label><input type="text" name="agent" value="manual"></div>
+            <div><label>Source Tool</label><input type="text" name="source_tool" placeholder="Burp, browser, curl"></div>
+          </div>
+          <div class="form-group mt-4"><label>Summary</label><textarea name="summary"></textarea></div>
+          <button type="submit" class="btn btn-primary btn-sm">Add Observation</button>
+        </form>
+      </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════════
+         HYPOTHESES TAB — unchanged
+    ════════════════════════════════════════════════════════ -->
+    <div id="tab-hypotheses" class="tab-panel">
+      <div class="stack-list">
+        {% if hypotheses %}
+          {% for hypothesis in hypotheses %}
+            <div class="hyp-card">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+                <div>
+                  <div style="font-weight:600">{{ hypothesis.title }}</div>
+                  {% if hypothesis.weakness_hint %}<div class="tiny" style="margin-top:6px">weakness: {{ hypothesis.weakness_hint }}</div>{% endif %}
+                </div>
+                <div class="meta-line">
+                  {% if hypothesis.severity_hint %}<span class="badge badge-{{ hypothesis.severity_hint }}">{{ hypothesis.severity_hint }}</span>{% endif %}
+                  {% if hypothesis.cwe %}<span class="brief-chip">{{ hypothesis.cwe }}</span>{% endif %}
+                  <span class="brief-chip">{{ hypothesis.confidence }}</span>
+                  <span class="mono-tiny">{{ hypothesis.status }}</span>
+                </div>
+              </div>
+              {% if hypothesis.attack_path %}
+                <div class="md-body" style="margin-top:10px">{{ hypothesis.attack_path }}</div>
+              {% endif %}
+              {% if hypothesis.impact_hypothesis %}
+                <div class="tiny" style="margin-top:10px">impact: {{ hypothesis.impact_hypothesis }}</div>
+              {% endif %}
+              <div class="meta-line">
+                <span class="mono-tiny">{{ hypothesis.agent }}</span>
+                {% if hypothesis.observation_id %}<span class="tiny">from observation #{{ hypothesis.observation_id }}</span>{% endif %}
+                <span class="tiny">{{ hypothesis.updated_at.strftime('%Y-%m-%d %H:%M') if hypothesis.updated_at }}</span>
+              </div>
+              <div class="meta-line" style="margin-top:10px">
+                <form method="POST" action="{{ url_for('programs.promote_hypothesis', hid=hypothesis.id) }}">
+                  <input type="hidden" name="target" value="{{ program.name }}">
+                  <button type="submit" class="btn btn-primary btn-sm">Promote → Finding</button>
+                </form>
+                <form method="POST" action="{{ url_for('programs.delete_hypothesis', hid=hypothesis.id) }}" onsubmit="return confirm('Delete hypothesis?')">
+                  <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="muted-box">No hypotheses logged yet.</div>
+        {% endif %}
+      </div>
+
+      <div class="inline-form">
+        <div class="brief-label">+ Add Hypothesis</div>
+        <form method="POST" action="{{ url_for('programs.add_hypothesis', pid=program.id) }}">
+          <div class="form-row">
+            <div><label>Title</label><input type="text" name="title" required></div>
+            <div><label>Source Observation</label>
+              <select name="observation_id">
+                <option value="">— None —</option>
+                {% for observation in observations %}
+                  <option value="{{ observation.id }}">{{ observation.id }} · {{ observation.title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div><label>Weakness Hint</label><input type="text" name="weakness_hint" placeholder="IDOR, XSS, SSRF"></div>
+            <div><label>CWE</label><input type="text" name="cwe" placeholder="CWE-79"></div>
+            <div><label>Severity Hint</label><select name="severity_hint"><option value="">—</option>{% for s in severities %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+            <div><label>Status</label><select name="status">{% for s in hypothesis_statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+            <div><label>Confidence</label><select name="confidence">{% for c in confidence_levels %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></div>
+            <div><label>Agent</label><input type="text" name="agent" value="manual"></div>
+          </div>
+          <div class="form-group mt-4"><label>Attack Path</label><textarea name="attack_path"></textarea></div>
+          <div class="form-group"><label>Impact Hypothesis</label><textarea name="impact_hypothesis"></textarea></div>
+          <button type="submit" class="btn btn-primary btn-sm">Add Hypothesis</button>
+        </form>
+      </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════════
+         EVIDENCE TAB — unchanged
+    ════════════════════════════════════════════════════════ -->
+    <div id="tab-evidence" class="tab-panel">
+      {% if evidence_records %}
+        <div class="stack-list">
+          {% for evidence in evidence_records %}
+            <div class="evidence-card">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+                <div>
+                  <div style="font-weight:600">{{ evidence.title }}</div>
+                  <div class="meta-line">
+                    <span class="brief-chip">{{ evidence.evidence_type }}</span>
+                    {% if evidence.finding_id %}<span class="tiny">finding #{{ evidence.finding_id }}</span>{% endif %}
+                    {% if evidence.hypothesis_id %}<span class="tiny">hypothesis #{{ evidence.hypothesis_id }}</span>{% endif %}
+                    {% if evidence.observation_id %}<span class="tiny">observation #{{ evidence.observation_id }}</span>{% endif %}
+                  </div>
+                </div>
+                <div class="meta-line">
+                  {% if evidence.request_method %}<span class="brief-chip">{{ evidence.request_method }}</span>{% endif %}
+                  {% if evidence.response_status %}<span class="brief-chip">HTTP {{ evidence.response_status }}</span>{% endif %}
+                </div>
+              </div>
+              {% if evidence.summary %}<div class="tiny" style="margin-top:8px">{{ evidence.summary }}</div>{% endif %}
+              {% if evidence.request_url %}<div class="mono-tiny" style="margin-top:8px">{{ evidence.request_url }}</div>{% endif %}
+              <div class="meta-line">
+                {% if evidence.source_tool %}<span class="tiny">source: {{ evidence.source_tool }}</span>{% endif %}
+                {% if evidence.account_label %}<span class="tiny">account: {{ evidence.account_label }}</span>{% endif %}
+                {% if evidence.auth_type %}<span class="tiny">auth: {{ evidence.auth_type }}</span>{% endif %}
+                <span class="tiny">{{ evidence.created_at.strftime('%Y-%m-%d %H:%M') if evidence.created_at }}</span>
+              </div>
+              {% if evidence.request_body_text %}
+                <pre>{{ evidence.request_body_text }}</pre>
+              {% endif %}
+              {% if evidence.response_body_text %}
+                <pre>{{ evidence.response_body_text }}</pre>
+              {% endif %}
+              <form method="POST" action="{{ url_for('programs.delete_evidence', eid=evidence.id) }}" onsubmit="return confirm('Delete evidence record?')" style="margin-top:10px">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="muted-box">No structured evidence records yet. Add them through MCP/API using `bb_attach_http_pair`.</div>
+      {% endif %}
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════════
+         RECON TAB — unchanged
+    ════════════════════════════════════════════════════════ -->
     <div id="tab-recon" class="tab-panel">
       {% set cat_icons = {'subdomain':'🌐','endpoint':'🔗','technology':'⚙️','parameter':'🔧','credential':'🔑','ip':'📡','other':'📌'} %}
       {% for category in recon_categories %}
         {% if recon_grouped.get(category) %}
         <div class="recon-section">
-          <div class="recon-category-title">
+          <div class="stack-title">
             {{ cat_icons.get(category,'📌') }} {{ category }}
             <span class="tab-count" style="margin-left:0">{{ recon_grouped[category]|length }}</span>
           </div>
@@ -237,8 +896,7 @@
             <div class="recon-chip" title="{{ r.notes or '' }}">
               <span>{{ r.value }}</span>
               {% if r.source %}<span class="chip-source">{{ r.source }}</span>{% endif %}
-              <form method="POST" action="{{ url_for('programs.delete_recon', rid=r.id) }}"
-                    style="display:inline" onsubmit="return confirm('Delete?')">
+              <form method="POST" action="{{ url_for('programs.delete_recon', rid=r.id) }}" style="display:inline" onsubmit="return confirm('Delete?')">
                 <button type="submit" class="chip-del" title="Delete">✕</button>
               </form>
             </div>
@@ -248,27 +906,24 @@
         {% endif %}
       {% endfor %}
 
-      <div class="add-recon-form">
-        <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">
-          + Add Recon Entry
-        </div>
+      <div class="inline-form">
+        <div class="brief-label">+ Add Recon Entry</div>
         <form method="POST" action="{{ url_for('programs.add_recon', pid=program.id) }}">
           <div class="form-row">
-            <select name="category" class="f-cat">
-              {% for c in recon_categories %}
-              <option value="{{ c }}">{{ c }}</option>
-              {% endfor %}
-            </select>
-            <input type="text" name="value" placeholder="Value (domain, URL, tech…)" class="f-val" required>
-            <input type="text" name="source" placeholder="Source (tool/agent)" class="f-src">
+            <div><label>Category</label><select name="category">{% for c in recon_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></div>
+            <div style="flex:2"><label>Value</label><input type="text" name="value" required></div>
+            <div><label>Source</label><input type="text" name="source"></div>
             <button type="submit" class="btn btn-primary btn-sm">Add</button>
           </div>
-          <input type="text" name="notes" placeholder="Notes (optional)" class="f-notes" style="margin-top:8px">
+          <div class="form-group mt-4"><label>Notes</label><input type="text" name="notes"></div>
         </form>
       </div>
     </div>
 
-    <!-- Scope tab -->
+
+    <!-- ═══════════════════════════════════════════════════════
+         SCOPE TAB — unchanged
+    ════════════════════════════════════════════════════════ -->
     <div id="tab-scope" class="tab-panel">
       <div class="scope-grid">
         <div class="scope-box in-scope">
@@ -291,22 +946,21 @@
       <a href="{{ url_for('programs.edit_program', pid=program.id) }}" class="btn btn-ghost btn-sm">Edit Scope →</a>
     </div>
 
-    <!-- Notes tab -->
+
+    <!-- ═══════════════════════════════════════════════════════
+         NOTES TAB — unchanged
+    ════════════════════════════════════════════════════════ -->
     <div id="tab-notes" class="tab-panel">
       {% if program.notes %}
         <div class="md-body" id="md-notes">{{ program.notes }}</div>
-        <div style="margin-top:16px">
-          <a href="{{ url_for('programs.edit_program', pid=program.id) }}" class="btn btn-ghost btn-sm">Edit Notes →</a>
-        </div>
+        <div style="margin-top:16px"><a href="{{ url_for('programs.edit_program', pid=program.id) }}" class="btn btn-ghost btn-sm">Edit Notes →</a></div>
       {% else %}
-        <div class="text-muted" style="padding:20px 0">No notes yet.
-          <a href="{{ url_for('programs.edit_program', pid=program.id) }}" style="color:var(--accent2)">Add notes →</a>
-        </div>
+        <div class="muted-box">No notes yet. <a href="{{ url_for('programs.edit_program', pid=program.id) }}" style="color:var(--accent2)">Add notes →</a></div>
       {% endif %}
     </div>
-  </div>
 
-  <!-- Danger zone -->
+  </div><!-- /card -->
+
   <div class="danger-zone">
     <h3>⚠ Danger Zone</h3>
     <form method="POST" action="{{ url_for('programs.delete_program', pid=program.id) }}"
@@ -314,18 +968,18 @@
       <button type="submit" class="btn btn-danger btn-sm">Delete Program</button>
     </form>
   </div>
-
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
   marked.setOptions({ breaks:true, gfm:true });
   ['md-scope-in','md-scope-out','md-notes'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = marked.parse(el.textContent);
+    if (el) el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
   });
   document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
 
@@ -336,8 +990,23 @@
     btn.classList.add('active');
   }
 
-  if (window.location.hash === '#recon') {
-    document.querySelectorAll('.tab-btn')[1].click();
+  function showSigTab(name, btn) {
+    document.querySelectorAll('.sig-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.sig-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('sig-'+name).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  const hashToTab = {
+    '#recon': 'recon-tab-btn',
+    '#observations': 'observations-tab-btn',
+    '#hypotheses': 'hypotheses-tab-btn',
+    '#evidence': 'evidence-tab-btn',
+    '#assets': 'assets-tab-btn'
+  };
+  const btnId = hashToTab[window.location.hash];
+  if (btnId) {
+    document.getElementById(btnId)?.click();
   }
 </script>
 {% endblock %}

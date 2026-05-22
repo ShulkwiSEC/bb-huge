@@ -15,6 +15,7 @@ Configure in your agent:
 import json
 import sys
 import os
+import urllib.parse
 import urllib.request
 import urllib.error
 import logging
@@ -37,7 +38,7 @@ sys.stderr = open(_LOG_FILE, "a", buffering=1)
 
 # ── Config ───────────────────────────────────────────────────────────────────
 BASE_URL = os.environ.get("BB_HUGE_URL", "http://127.0.0.1:5000")
-DEV_KEY = os.environ.get("DEV_KEY", "shulkwisec_123")
+DEV_KEY = os.environ.get("DEV_KEY", "bb-huge-dev-key-change-me")
 HEADERS = {"Content-Type": "application/json", "X-Dev-Key": DEV_KEY}
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -74,6 +75,15 @@ def api_put(path, b):
 
 def api_delete(path):
     return _req("DELETE", path)
+
+
+def _qs(params: dict) -> str:
+    clean = {}
+    for key, value in params.items():
+        if value is None or value == "":
+            continue
+        clean[key] = value
+    return urllib.parse.urlencode(clean, doseq=True)
 
 
 # ── Tool definitions ──────────────────────────────────────────────────────────
@@ -474,6 +484,367 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "bb_get_program_brief",
+        "description": "Get a compact briefing for a program: scope, saved context, recent findings, recent recon, open observations, and open hypotheses.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {
+                    "type": "integer",
+                    "description": "Program ID",
+                }
+            },
+        },
+    },
+    {
+        "name": "bb_log_observation",
+        "description": "Log a low-confidence signal or odd behavior under a program without creating a full finding yet.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "title"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "title": {"type": "string"},
+                "summary": {"type": "string"},
+                "category": {
+                    "type": "string",
+                    "enum": [
+                        "behavior",
+                        "auth",
+                        "access_control",
+                        "input_handling",
+                        "business_logic",
+                        "rate_limit",
+                        "recon",
+                        "other",
+                    ],
+                    "default": "other",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["open", "testing", "closed", "promoted"],
+                    "default": "open",
+                },
+                "agent": {"type": "string"},
+                "source_tool": {"type": "string"},
+                "confidence": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                    "default": "medium",
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_log_hypothesis",
+        "description": "Log a stronger candidate vulnerability under a program before promoting it to a full finding.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "title"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "observation_id": {"type": "integer"},
+                "title": {"type": "string"},
+                "weakness_hint": {"type": "string"},
+                "cwe": {"type": "string"},
+                "severity_hint": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "informational"],
+                },
+                "attack_path": {"type": "string"},
+                "impact_hypothesis": {"type": "string"},
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "open",
+                        "testing",
+                        "confirmed",
+                        "rejected",
+                        "duplicate",
+                        "promoted",
+                    ],
+                    "default": "open",
+                },
+                "agent": {"type": "string"},
+                "confidence": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                    "default": "medium",
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_attach_http_pair",
+        "description": "Attach a structured HTTP request/response evidence record to a program and optionally link it to a finding, hypothesis, or observation.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "finding_id": {"type": "integer"},
+                "hypothesis_id": {"type": "integer"},
+                "observation_id": {"type": "integer"},
+                "title": {"type": "string"},
+                "summary": {"type": "string"},
+                "request_method": {"type": "string"},
+                "request_url": {"type": "string"},
+                "request_headers": {"type": "object"},
+                "request_body_text": {"type": "string"},
+                "response_status": {"type": "integer"},
+                "response_headers": {"type": "object"},
+                "response_body_text": {"type": "string"},
+                "account_label": {"type": "string"},
+                "auth_type": {"type": "string"},
+                "source_tool": {"type": "string"},
+                "occurred_at": {
+                    "type": "string",
+                    "description": "ISO-8601 timestamp when the exchange occurred",
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_check_existing_work",
+        "description": "Check for likely duplicate or related work across findings, observations, and hypotheses before creating a new record.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "program_id": {"type": "integer"},
+                "target": {"type": "string"},
+                "title": {"type": "string"},
+                "cwe": {"type": "string"},
+                "description": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "bb_promote_observation",
+        "description": "Promote an observation into a linked hypothesis when the signal becomes a serious candidate bug.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "title": {"type": "string"},
+                "weakness_hint": {"type": "string"},
+                "cwe": {"type": "string"},
+                "severity_hint": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "informational"],
+                },
+                "attack_path": {"type": "string"},
+                "impact_hypothesis": {"type": "string"},
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "open",
+                        "testing",
+                        "confirmed",
+                        "rejected",
+                        "duplicate",
+                        "promoted",
+                    ],
+                },
+                "agent": {"type": "string"},
+                "confidence": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_promote_hypothesis",
+        "description": "Promote a hypothesis into a linked finding once the issue is mature enough for the main findings list.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "title": {"type": "string"},
+                "target": {"type": "string"},
+                "platform": {"type": "string"},
+                "severity": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "informational"],
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "discovered",
+                        "debugging",
+                        "confirmed",
+                        "reported",
+                        "rewarded",
+                        "denied",
+                        "duplicate",
+                        "n/a",
+                    ],
+                },
+                "agent": {"type": "string"},
+                "cwe": {"type": "string"},
+                "cvss": {"type": "number"},
+                "confidence": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                },
+                "description": {"type": "string"},
+                "poc": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "bb_generate_report_context",
+        "description": "Get a report-ready context pack for a finding, including linked hypothesis data, evidence summary, attachments, notes, and unresolved gaps.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer", "description": "Finding ID"},
+            },
+        },
+    },
+    {
+        "name": "bb_list_assets",
+        "description": "List assets (domains, subdomains, API hosts, etc.) for a program.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "kind": {
+                    "type": "string",
+                    "enum": ["domain", "subdomain", "api_host", "mobile_app", "repo", "other"],
+                    "description": "Filter by asset kind",
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_add_asset",
+        "description": "Add an asset (domain, subdomain, API host, etc.) to a program.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "kind", "identifier"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "kind": {
+                    "type": "string",
+                    "enum": ["domain", "subdomain", "api_host", "mobile_app", "repo", "other"],
+                },
+                "identifier": {"type": "string", "description": "Domain, URL, or identifier"},
+                "environment": {
+                    "type": "string",
+                    "enum": ["prod", "staging", "dev", "test", "unknown"],
+                    "default": "unknown",
+                },
+                "notes": {"type": "string"},
+                "active": {"type": "boolean", "default": True},
+            },
+        },
+    },
+    {
+        "name": "bb_update_asset",
+        "description": "Update an existing asset's fields.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "kind": {
+                    "type": "string",
+                    "enum": ["domain", "subdomain", "api_host", "mobile_app", "repo", "other"],
+                },
+                "identifier": {"type": "string"},
+                "environment": {
+                    "type": "string",
+                    "enum": ["prod", "staging", "dev", "test", "unknown"],
+                },
+                "notes": {"type": "string"},
+                "active": {"type": "boolean"},
+            },
+        },
+    },
+    {
+        "name": "bb_delete_asset",
+        "description": "Delete an asset and all its associated endpoints.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_list_endpoints",
+        "description": "List endpoints under an asset (API routes, web paths, etc.).",
+        "inputSchema": {
+            "type": "object",
+            "required": ["asset_id"],
+            "properties": {
+                "asset_id": {"type": "integer"},
+                "method": {"type": "string", "description": "Filter by HTTP method e.g. GET"},
+            },
+        },
+    },
+    {
+        "name": "bb_add_endpoint",
+        "description": "Add an endpoint (URL path, API route) under an asset.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["asset_id", "method", "path"],
+            "properties": {
+                "asset_id": {"type": "integer"},
+                "method": {"type": "string", "default": "GET"},
+                "path": {"type": "string", "description": "URL path e.g. /api/users"},
+                "protocol": {
+                    "type": "string",
+                    "enum": ["http", "https", "graphql", "ws", "wss", "other"],
+                    "default": "https",
+                },
+                "content_type": {"type": "string", "description": "e.g. application/json"},
+                "auth_required": {"type": "boolean"},
+                "discovered_by": {"type": "string", "description": "Tool or agent that found this"},
+                "notes": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "bb_update_endpoint",
+        "description": "Update an existing endpoint's fields.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "method": {"type": "string"},
+                "path": {"type": "string"},
+                "protocol": {
+                    "type": "string",
+                    "enum": ["http", "https", "graphql", "ws", "wss", "other"],
+                },
+                "content_type": {"type": "string"},
+                "auth_required": {"type": "boolean"},
+                "discovered_by": {"type": "string"},
+                "notes": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "bb_delete_endpoint",
+        "description": "Delete an endpoint.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+            },
+        },
+    },
 ]
 
 
@@ -519,7 +890,7 @@ def dispatch(name: str, args: dict) -> Any:
         return api_post("/findings", args)
 
     elif name == "bb_list_findings":
-        qs = "&".join(f"{k}={v}" for k, v in args.items() if v)
+        qs = _qs(args)
         return api_get(f"/findings{'?' + qs if qs else ''}")
 
     elif name == "bb_get_finding":
@@ -554,7 +925,7 @@ def dispatch(name: str, args: dict) -> Any:
             return {"error": str(e)}
 
     elif name == "bb_search_similar":
-        qs = "&".join(f"{k}={v}" for k, v in args.items() if v)
+        qs = _qs(args)
         return api_get(f"/findings/similar{'?' + qs if qs else ''}")
 
     elif name == "bb_add_note":
@@ -583,6 +954,68 @@ def dispatch(name: str, args: dict) -> Any:
     elif name == "bb_save_context":
         pid = args.pop("program_id")
         return api_put(f"/programs/{pid}/context", {"data": args})
+
+    elif name == "bb_get_program_brief":
+        return api_get(f"/programs/{args['program_id']}/brief")
+
+    elif name == "bb_log_observation":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/observations", args)
+
+    elif name == "bb_log_hypothesis":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/hypotheses", args)
+
+    elif name == "bb_attach_http_pair":
+        payload = {"evidence_type": "http_exchange"}
+        payload.update(args)
+        return api_post("/evidence", payload)
+
+    elif name == "bb_check_existing_work":
+        return api_post("/similarity/check", args)
+
+    elif name == "bb_promote_observation":
+        oid = args.pop("id")
+        return api_post(f"/observations/{oid}/promote", args)
+
+    elif name == "bb_promote_hypothesis":
+        hid = args.pop("id")
+        return api_post(f"/hypotheses/{hid}/promote", args)
+
+    elif name == "bb_generate_report_context":
+        return api_get(f"/findings/{args['id']}/report-pack")
+
+    elif name == "bb_list_assets":
+        pid = args.pop("program_id")
+        qs = _qs(args)
+        return api_get(f"/programs/{pid}/assets{'?' + qs if qs else ''}")
+
+    elif name == "bb_add_asset":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/assets", args)
+
+    elif name == "bb_update_asset":
+        aid = args.pop("id")
+        return api_patch(f"/assets/{aid}", args)
+
+    elif name == "bb_delete_asset":
+        return api_delete(f"/assets/{args['id']}")
+
+    elif name == "bb_list_endpoints":
+        aid = args.pop("asset_id")
+        qs = _qs(args)
+        return api_get(f"/assets/{aid}/endpoints{'?' + qs if qs else ''}")
+
+    elif name == "bb_add_endpoint":
+        aid = args.pop("asset_id")
+        return api_post(f"/assets/{aid}/endpoints", args)
+
+    elif name == "bb_update_endpoint":
+        eid = args.pop("id")
+        return api_patch(f"/endpoints/{eid}", args)
+
+    elif name == "bb_delete_endpoint":
+        return api_delete(f"/endpoints/{args['id']}")
 
     else:
         return {"error": f"Unknown tool: {name}"}

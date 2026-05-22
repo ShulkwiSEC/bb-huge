@@ -25,30 +25,98 @@ than a perfect entry that never gets written.
 
 ---
 
+## Evidence Pipeline (The Core Workflow)
+
+Vulnerabilities don't appear fully formed. They evolve through stages. bb-huge
+has a record type for each stage so you never lose a lead:
+
+```
+Weak Signal / Odd Behavior
+      │
+      ▼
+  bb_log_observation()      ← low confidence, incomplete
+      │
+      ▼
+  bb_log_hypothesis()       ← stronger candidate, testable theory
+      │
+      ▼
+  bb_create_finding()       ← mature issue, deserves a real record
+      │
+      ▼
+  bb_generate_report_context()  ← ready to write the report
+```
+
+**At every stage**, attach evidence with `bb_attach_http_pair()` so nothing is
+lost when you promote. Evidence follows the record — if you attach an HTTP pair
+to an observation and later promote it to a hypothesis, the evidence stays linked.
+
+Rule: **Use the lightest useful record.** If you're unsure, go one level down.
+A resolved `observation` is cleaner than a `finding` you have to delete.
+
+---
+
 ## MCP Tools
 
 All portal operations use the `bb-huge` MCP server. Auth is handled via the
 `X-Dev-Key` header automatically — no extra setup needed.
 
+### Findings
+
 | Tool | When to use |
 |------|-------------|
-| `bb_create_finding` | The moment a vulnerability is suspected |
+| `bb_create_finding` | The moment a vulnerability is mature enough for a main record |
 | `bb_list_findings` | Search or review existing findings |
 | `bb_get_finding` | Pull full details of one finding |
 | `bb_update_finding` | Add PoC, description, CWE, or any field |
 | `bb_update_status` | Advance the status through the workflow |
 | `bb_delete_finding` | Remove a finding (use sparingly) |
-| `bb_search_similar` | Check for existing duplicates before creating a finding |
-| `bb_upload_attachment` | Attach screenshots, Burp exports, or scripts |
-| `bb_add_note` | Log progress, dead ends, or partial findings without overwriting fields |
 | `bb_bulk_update_status` | Update status of multiple findings at once |
+| `bb_search_similar` | Check for existing duplicates before creating a finding |
+| `bb_generate_report_context` | Pull a report-ready pack for a finding before writing the report |
+
+### Programs, Recon & Context
+
+| Tool | When to use |
+|------|-------------|
 | `bb_list_programs` | Look up programs to find their IDs |
 | `bb_create_program` | Create a new bug bounty program entry with scope |
+| `bb_get_program_brief` | **START HERE** — pull one compact program briefing before work starts |
 | `bb_add_recon` | Log recon data (subdomains, endpoints, tech) under a program |
-| `bb_get_stats` | Dashboard summary — totals by severity/status/agent |
 | `bb_get_context` | Retrieve pre-hunt Q&A data for a program |
 | `bb_save_context` | Save pre-hunt Q&A answers for a program |
+
+### Observations, Hypotheses & Evidence
+
+| Tool | When to use |
+|------|-------------|
+| `bb_log_observation` | Record a weak signal, odd behavior, or incomplete recon observation |
+| `bb_log_hypothesis` | Track a stronger candidate bug before promotion to a finding |
+| `bb_attach_http_pair` | Store a structured HTTP request/response as evidence |
+| `bb_promote_observation` | Convert a matured observation into a linked hypothesis |
+| `bb_promote_hypothesis` | Convert a matured hypothesis into a linked finding |
+| `bb_check_existing_work` | **BEFORE creating any record** — check for duplicates or related work |
+| `bb_upload_attachment` | Attach screenshots, Burp exports, or scripts |
+
+### Assets & Endpoints
+
+| Tool | When to use |
+|------|-------------|
+| `bb_list_assets` | View all assets (domains, hosts, apps) under a program |
+| `bb_add_asset` | Log a discovered domain, subdomain, API host, or mobile app |
+| `bb_update_asset` | Change kind, environment, or deactivate an asset |
+| `bb_delete_asset` | Remove an asset and all its endpoints |
+| `bb_list_endpoints` | Browse API routes and paths under an asset |
+| `bb_add_endpoint` | Document a URL path with method, protocol, and auth info |
+| `bb_update_endpoint` | Fix path, content-type, or discovered-by metadata |
+| `bb_delete_endpoint` | Remove a stale or wrong endpoint |
+
+### Notifications & Stats
+
+| Tool | When to use |
+|------|-------------|
+| `bb_get_stats` | Dashboard summary — totals by severity/status/agent |
 | `bb_notify` | Send an alert to Discord/Telegram webhooks |
+| `bb_add_note` | Log progress, dead ends, or partial findings without overwriting fields |
 
 **Agent identity rule**: Always set `agent` to the identity of whoever is
 running (`gemini-cli`, `claude`, `claude-code`, `emmu`, `codex`). Never use
@@ -58,47 +126,22 @@ running (`gemini-cli`, `claude`, `claude-code`, `emmu`, `codex`). Never use
 
 ## Linking Findings to Programs
 
-Findings can be linked to Programs in bb-huge. This keeps your reports organized
-by target and lets you track scope, recon data, and payouts per program.
+Findings, observations, and hypotheses can all be linked to Programs in bb-huge.
+This keeps your reports organized by target and lets you track scope, recon data,
+and payouts per program.
 
-**2-step workflow:**
+**3-step workflow:**
 
-1. **Look up or create the program** — call `bb_list_programs()` to search for an
-   existing program. If it doesn't exist, call `bb_create_program()` with `name`
+1. **Pull the program brief** — call `bb_get_program_brief(id)` to get scope,
+   recent findings, open observations/hypotheses, and recon — all in one call.
+2. **Look up or create the program** — call `bb_list_programs()` if you don't
+   have the ID yet. If it doesn't exist, call `bb_create_program()` with `name`
    (target domain/program name) and optional `platform`, `program_url`,
    `scope_in`, `scope_out`.
-2. **Pass the program_id** — include `program_id: <id>` in `bb_create_finding()`
-   to link the finding.
+3. **Pass the program_id** — include `program_id: <id>` in every record you
+   create to link it.
 
-**Lookup example:**
-```json
-bb_list_programs()
-// → returns [{ id: 1, name: "Example Corp", platform: "HackerOne" }, ...]
-```
-
-**Create program if not found:**
-```json
-bb_create_program({
-  "name": "Example Corp",
-  "platform": "HackerOne",
-  "program_url": "https://hackerone.com/example",
-  "scope_in": "*.example.com"
-})
-// → returns { id: 2, name: "Example Corp" }
-```
-
-**Create finding linked to program:**
-```json
-bb_create_finding({
-  "title": "IDOR in user profile API",
-  "target": "api.example.com",
-  "severity": "high",
-  "program_id": 2,
-  "agent": "claude"
-})
-```
-
-Always call `bb_list_programs()` before `bb_create_finding()` to check if a
+**Always call `bb_list_programs()` before `bb_create_program()`** to check if a
 program already exists. Never create duplicate programs.
 
 ---
@@ -121,9 +164,9 @@ When in doubt, log at the higher severity and downgrade after confirmation.
 
 ```
 discovered → debugging → confirmed → reported → rewarded
-                                   ↘ denied
-                                   ↘ duplicate
-                                   ↘ n/a
+                                    ↘ denied
+                                    ↘ duplicate
+                                    ↘ n/a
 ```
 
 - **discovered**: spotted it, not verified yet
@@ -139,83 +182,145 @@ Move through the chain as evidence accumulates. Never skip statuses.
 
 ---
 
+## Observation & Hypothesis Statuses
+
+### Observation
+```
+open → testing → promoted
+                ↘ closed
+```
+
+### Hypothesis
+```
+open → testing → confirmed → promoted
+                ↘ rejected
+                ↘ duplicate
+```
+
+---
+
 ## Core Logging Protocol
 
 When a vulnerability is discovered during any session:
 
-1. **Immediately** call `bb_list_programs()` to find the target program's `id`,
-   then call `bb_create_finding` with `status: discovered` and `program_id` if
-   a matching program exists.
-2. Fill title, target, severity, agent — even if description is thin.
-3. If local evidence files exist (Burp exports, scripts, logs, screenshots),
-   call `bb_upload_attachment` right after creation using the returned `id`.
-4. As testing progresses, call `bb_update_finding` to append PoC and steps.
-5. When fully verified and reproducible, call `bb_update_status` → `confirmed`.
-
----
-
-## Script Utilities
-
-Two local Python scripts bridge your terminal workspace and the portal.
-Both inherit auth from environment variables — no credentials hardcoded.
-
-| Script | Invocation | Purpose |
-|--------|-----------|---------|
-| `bb-orchestrator-list-skills.py` | `python scripts/bb-orchestrator-list-skills.py` | Lists every skill in `~/.gemini/skills/` so you know which specialist tools are available |
-| `bb-dump-attachments.py` | `python scripts/bb-dump-attachments.py <id>` | Downloads all attachments for finding `<id>` into `./finding_<id>_assets/` for local review |
-
-Environment variables (set in shell or `.env` before running):
-- `BB_HUGE_URL` — defaults to `http://127.0.0.1:5000`
-- `DEV_KEY` — defaults to `shulkwisec_123`
+1. **Immediately** call `bb_get_program_brief(program_id)` to understand the
+   current state of the target — scope, recent findings, open hypotheses,
+   observations, and recon.
+2. Call `bb_check_existing_work()` before creating any fresh record. This
+   checks across findings, observations, and hypotheses in one call.
+3. **If the signal is weak or partial** → `bb_log_observation()`. This is the
+   default starting point. Observations are cheap to create and easy to close.
+4. **If the signal is stronger but not yet a finding** → `bb_log_hypothesis()`.
+   Include what you suspect (`weakness_hint`), how to test (`attack_path`), and
+   what the impact would be if confirmed (`impact_hypothesis`).
+5. **Preserve evidence immediately** → `bb_attach_http_pair()` or
+   `bb_upload_attachment()`. Structured evidence (HTTP request/response pairs)
+   is preferred because it can be read by future agents without downloading files.
+6. **Promote when mature** → `bb_promote_observation()` → hypothesis, then
+   `bb_promote_hypothesis()` → finding. Or skip directly to
+   `bb_create_finding()` if the issue is already mature enough.
+7. **As testing progresses** → `bb_update_finding()` to append PoC, evidence,
+   and steps.
+8. **When fully verified and reproducible** → `bb_update_status()` → `confirmed`.
+9. **When ready to write the report** → `bb_generate_report_context()` to pull
+   a report-ready pack with all evidence, links, and unresolved gaps.
 
 ---
 
 ## Standard Operating Procedures
 
-### SOP-1 · New Target Assigned
-1. Run `bb-orchestrator-list-skills.py` — print the available skill roster.
-2. Based on the target, propose which skills to activate:
-   - Web app → web/recon skills for subdomain enum and endpoint discovery
-   - API surface → API-focused skills if present, otherwise treat as web
-   - Auth / login flows → auth-bypass methodology
-3. Create a placeholder finding: `status: debugging`, title `"Recon: <target>"`,
-   to anchor notes as recon progresses. Update it as sub-findings emerge.
+### SOP-1 · New Target / Session Start
 
-### SOP-2 · Vulnerability Found
-1. `bb_list_programs()` → find program `id` → `bb_create_finding` with
-   `status: discovered` and `program_id` — fill every known field.
-2. `bb_upload_attachment` — any local evidence that exists right now.
-3. Note the context of discovery in `description` (what you were testing, what
-   parameter, what endpoint).
-4. Continue enriching with `bb_update_finding` as you build the PoC.
-5. `bb_update_status` → `confirmed` only when you can reliably reproduce it.
+Run this when assigned a new target or starting a fresh session:
+
+1. **`bb_list_programs()`** — check if the target already has a program entry.
+2. If not found: **`bb_create_program({name, platform})`** — create it with
+   name and optional scope/platform.
+3. **`bb_get_program_brief(program_id)`** — pull the compact briefing. This
+   returns scope, recent findings, open observations, open hypotheses, recent
+   recon, duplicate hotspots, and target context — all in one API call.
+   You do NOT need to call separate lookups.
+4. **`bb_get_context(program_id)`** — check if SOP-5 pre-hunt Q&A was already
+   answered. If empty, run SOP-5 questioning before continuing.
+5. If prior work exists on this target:
+   - Read the recent findings from the brief
+   - For any open observations or hypotheses, read their details
+   - For any in-progress finding, run `bb_get_finding()` + dump attachments
+6. **Report a one-paragraph status summary** of where things stand before
+   starting any new testing.
+
+---
+
+### SOP-2 · Vulnerability / Anomaly Found
+
+1. **`bb_get_program_brief(program_id)`** — get current state of target.
+2. **`bb_check_existing_work()`** — avoid creating a duplicate of anything
+   already logged (checks across findings, observations, and hypotheses).
+3. **Assess confidence and choose the right record type:**
+
+   | Confidence | Action |
+   |------------|--------|
+   | Low — odd behavior, not sure if exploitable | `bb_log_observation()` |
+   | Medium — looks like a real bug, testing | `bb_log_hypothesis()` |
+   | High — confirmed, reproducible | `bb_create_finding()` |
+
+4. **`bb_attach_http_pair()`** or **`bb_upload_attachment()`** — preserve
+   evidence immediately. Prefer structured HTTP pairs over raw file attachments.
+5. Continue testing and enriching:
+   - `bb_update_finding()` — append PoC, steps, and notes
+   - `bb_promote_observation()` → hypothesis when signal strengthens
+   - `bb_promote_hypothesis()` → finding when confirmed
+6. **`bb_update_status()` → `confirmed`** only when you can reliably
+   reproduce it 3 times in a row.
+
+---
 
 ### SOP-3 · Resume a Previous Finding
+
 When asked to "continue on finding X" or "setup workspace for X":
-1. `bb_get_finding X` — read the current state and existing notes.
-2. `python scripts/bb-dump-attachments.py X` — pull all evidence to local disk.
-3. Read the downloaded files to fully restore context.
-4. Give a one-paragraph summary of where things stand before continuing.
+
+1. **`bb_get_finding(X)`** — read the current state and existing notes.
+2. **`bb_generate_report_context(X)`** — pull the full report pack including
+   linked hypothesis data, evidence summary, attachments, and unresolved gaps.
+3. **`python scripts/bb-dump-attachments.py X`** — pull all evidence files to
+   local disk.
+4. Read the downloaded files to fully restore context.
+5. **Give a one-paragraph summary** of where things stand before continuing:
+   - Current status and severity
+   - What evidence exists
+   - What gaps remain (CWE? CVSS? PoC? evidence?)
+   - Suggested next step
+
+---
 
 ### SOP-4 · End of Session
+
 Before closing any research session:
-1. `bb_get_stats` — confirm everything found is logged.
-2. For any finding still in `debugging`, add a progress note via
-   `bb_update_finding` so the next session picks up cleanly.
-3. Flag any `confirmed` findings that haven't been `reported` yet.
+
+1. **`bb_get_stats()`** — confirm everything found is logged.
+2. For any finding still in `debugging`, add a progress note:
+   `bb_add_note(id, content="Progress: <what was tested, what remains>")`.
+3. For any `confirmed` findings that haven't been `reported` yet:
+   pull a report pack with `bb_generate_report_context(id)` so the next session
+   starts from a report-ready bundle.
+4. For any open `observation` or `hypothesis` that you're abandoning:
+   add a brief note explaining why, then close them (status → `closed` or
+   `rejected`).
+5. **Flag next-session priorities** — what should the next agent pick up first?
+
+---
 
 ### SOP-5 · Pre-Hunt Questioning Layer ⭐
 
-**THIS IS THE MOST IMPORTANT STEP.** Before starting any work on a new target,
-you MUST collect context from the user. This data is stored once and never
-re-asked.
+**This is the most important step for a new target.** Collect context from the
+user once, persist it forever with `bb_save_context()`.
 
 **When to run:**
 - A new target/program is assigned
-- `bb_get_context` returns empty data for the program
+- `bb_get_context()` returns empty data for the program
 
 **When NOT to run:**
-- You already called `bb_get_context` and it returned non-empty data
+- You already called `bb_get_context()` and it returned non-empty data
 - You are resuming work on an existing target (SOP-3 applies instead)
 
 **Workflow:**
@@ -223,9 +328,9 @@ re-asked.
 ```
 1. bb_list_programs()                          — check if program exists
 2. If not found: bb_create_program({name})     — create it first
-3. bb_get_context({program_id})                — check if context already saved
-4. If data is non-empty → skip to testing
-5. If data is empty → RUN QUESTIONING (below)
+3. bb_get_program_brief({program_id})          — check context + get full state
+4. If bb_get_context() returns non-empty → skip to testing
+5. If empty → RUN QUESTIONING (below)
 6. bb_save_context({program_id, data})         — persist answers permanently
 ```
 
@@ -294,37 +399,112 @@ questions again — check `bb_get_context` every session.
 
 ---
 
+### SOP-6 · Report Preparation
+
+When a finding is `confirmed` and you're ready to write the report:
+
+1. **`bb_generate_report_context(finding_id)`** — pull the full report pack:
+   - Normalized finding summary (title, target, severity, CWE, confidence)
+   - All linked hypothesis data (attack path, impact, weakness hint)
+   - All structured evidence records (HTTP pairs, repro steps, screenshots)
+   - All attachments
+   - All notes
+   - Unresolved gaps (missing CWE, CVSS, PoC, evidence)
+2. **Fill the unresolved gaps** before writing the report:
+   - `bb_update_finding()` to add missing CWE, CVSS, PoC
+   - `bb_upload_attachment()` to attach screenshots or recordings
+3. **Load `bb-report-templates.md`** for the matching vulnerability type.
+4. Write the report using the template, filling from the report pack data.
+5. Submit to the bug bounty platform.
+6. **`bb_update_status()` → `reported`**.
+
+---
+
+## Script Utilities
+
+Two local Python scripts bridge your terminal workspace and the portal.
+Both inherit auth from environment variables — no credentials hardcoded.
+
+| Script | Invocation | Purpose |
+|--------|-----------|---------|
+| `bb-orchestrator-list-skills.py` | `python scripts/bb-orchestrator-list-skills.py` | Lists every skill in `~/.gemini/skills/` so you know which specialist tools are available |
+| `bb-dump-attachments.py` | `python scripts/bb-dump-attachments.py <id>` | Downloads all attachments for finding `<id>` into `./finding_<id>_assets/` for local review |
+
+Environment variables (set in shell or `.env` before running):
+- `BB_HUGE_URL` — defaults to `http://127.0.0.1:5000`
+- `DEV_KEY` — defaults to `bb-huge-dev-key-change-me`
+
+---
+
 ## Example Payloads
 
-**Minimal — log immediately, enrich later:**
+**Minimal observation — log a weak signal:**
 ```json
-{
-  "title": "IDOR on /api/user/profile — possible access to other users' PII",
+bb_log_observation({
+  "program_id": 1,
+  "title": "Unusual 500 error on /api/checkout with negative quantity",
+  "summary": "Sending quantity=-1 returns 500 with stack trace. Might be a bug, might be nothing.",
+  "category": "input_handling",
+  "confidence": "low",
+  "agent": "gemini-cli"
+})
+```
+
+**Hypothesis — stronger candidate:**
+```json
+bb_log_hypothesis({
+  "program_id": 1,
+  "title": "Possible IDOR on /api/user/profile — changing user_id returns other users' data",
+  "weakness_hint": "Broken Access Control — missing ownership check",
+  "cwe": "CWE-639",
+  "severity_hint": "high",
+  "attack_path": "Register two accounts, swap the user_id parameter, observe if foreign data is returned",
+  "impact_hypothesis": "Any authenticated user could read PII of all other users",
+  "confidence": "medium",
+  "agent": "gemini-cli"
+})
+```
+
+**Attach evidence during testing:**
+```json
+bb_attach_http_pair({
+  "program_id": 1,
+  "hypothesis_id": 5,
+  "request_method": "GET",
+  "request_url": "https://api.example.com/api/user/456/profile",
+  "response_status": 200,
+  "response_body_text": "{\"email\":\"victim@example.com\",\"ssn\":\"***-**-****\"}",
+  "auth_type": "JWT",
+  "account_label": "attacker-account-A"
+})
+```
+
+**Minimal finding — log immediately, enrich later:**
+```json
+bb_create_finding({
+  "title": "IDOR on /api/user/profile — access to other users' PII",
   "target": "app.example.com",
   "severity": "high",
+  "program_id": 1,
   "agent": "gemini-cli"
-}
+})
 ```
 
 **Full — confirmed finding ready to report:**
 ```json
-{
+bb_create_finding({
   "title": "Reflected XSS in search parameter",
   "target": "app.example.com",
   "platform": "HackerOne",
   "severity": "high",
   "status": "confirmed",
+  "program_id": 1,
   "agent": "gemini-cli",
   "cwe": "CWE-79",
   "cvss": 7.2,
   "description": "The `q` parameter on `/search` reflects unsanitized user input directly into the DOM without any encoding.",
   "poc": "## Steps\n1. Navigate to `/search?q=<script>alert(document.cookie)</script>`\n2. Observe script executes in the response.\n\n## Payload\n```\n<script>alert(document.cookie)</script>\n```"
-}
-```
-
-**Upload attachment** (after create returns id 42):
-```json
-{ "id": 42, "file_path": "./burp_request.txt" }
+})
 ```
 
 ---
