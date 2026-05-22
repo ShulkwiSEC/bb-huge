@@ -3,181 +3,469 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
 <style>
-  .detail-header {
-    display: flex; flex-wrap: wrap; gap: 12px;
-    align-items: flex-start; margin-bottom: 24px;
-  }
-  .detail-header-main { flex: 1; min-width: 0; }
-  .detail-title { font-size: 22px; font-weight: 600; line-height: 1.3; margin-bottom: 10px; }
-  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .meta-pill {
-    display: flex; align-items: center; gap: 5px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .meta-pill strong { color: var(--text); }
-  .meta-pill.mono strong { font-family: var(--mono); }
-  .meta-pill.program-pill { border-color: rgba(138,122,255,0.25); background: rgba(138,122,255,0.08); }
+/* ── DESIGN TOKENS ─────────────────────────────────── */
+:root {
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+  --font-mono:    'JetBrains Mono', var(--mono, monospace);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.25), 0 0 0 1px var(--border);
+  --shadow-glow: 0 0 0 1px var(--border), 0 4px 24px rgba(138,122,255,.08);
+  --transition: all .2s cubic-bezier(.4,0,.2,1);
+}
 
-  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow:auto; }
-  .tab-btn {
-    padding: 10px 18px; font-size: 13px; font-weight: 500;
-    background: none; border: none; color: var(--muted);
-    cursor: pointer; border-bottom: 2px solid transparent;
-    margin-bottom: -1px; transition: all .15s; font-family: var(--sans);
-    white-space: nowrap;
-  }
-  .tab-btn:hover { color: var(--text); }
-  .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
-  .tab-panel { display: none; animation: fadeIn 0.2s ease-out; }
-  .tab-panel.active { display: block; }
+/* ── PAGE SHELL ───────────────────────────────────── */
+.fd-page { max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; font-family: var(--font-body); }
 
-  .status-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .status-form select { width: auto; padding: 7px 10px; font-size: 13px; }
-  .attachment-grid, .evidence-grid, .related-grid, .gap-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 12px;
-  }
-  .attachment-card, .evidence-card, .related-card, .gap-card, .summary-card {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-  }
-  .attachment-card:hover, .evidence-card:hover, .related-card:hover { border-color: var(--border2); }
-  .attachment-icon { font-size: 20px; flex-shrink: 0; }
-  .attachment-name { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-  .attachment-name a, .related-card a { color: var(--accent2); text-decoration: none; }
-  .danger-zone {
-    border: 1px solid rgba(255,77,109,.2);
-    border-radius: 10px;
-    padding: 16px 20px;
-    margin-top: 24px;
-  }
-  .danger-zone h3 { font-size: 13px; color: var(--critical); margin-bottom: 10px; }
-  .cvss-big { font-family: var(--mono); font-size: 32px; font-weight: 700; line-height: 1; }
-  .info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-    margin-bottom: 24px;
-  }
-  .info-box {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-  }
-  .info-box .ib-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; font-weight: 600; margin-bottom: 6px; }
-  .info-box .ib-value { font-size: 13px; font-weight: 500; }
-  .note-timeline { position: relative; padding-left: 24px; }
-  .note-timeline::before {
-    content: ''; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--border); border-radius: 2px;
-  }
-  .note-entry {
-    position: relative; margin-bottom: 16px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
-  }
-  .note-entry::before {
-    content: ''; position: absolute; left: -20px; top: 16px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg);
-  }
-  .stack { display:grid; gap:12px; }
-  .tiny { font-size:11px; color:var(--muted); }
-  .mono-tiny { font-size:11px; color:var(--muted); font-family:var(--mono); }
-  .report-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  @media(max-width:900px){ .report-grid { grid-template-columns:1fr; } }
-  .report-box, .hyp-box {
-    background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:14px 16px;
-  }
-  .section-label {
-    font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px;
-  }
-  pre.code-block {
-    white-space:pre-wrap; overflow-wrap:anywhere; margin-top:10px;
-    background:rgba(0,0,0,.18); border:1px solid var(--border); border-radius:8px; padding:12px;
-  }
-  #program-switch { width: auto; padding: 6px 10px; font-size: 12px; }
+/* ── BREADCRUMB + BACK ────────────────────────────── */
+.fd-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted); text-decoration: none;
+  font-family: var(--font-mono); letter-spacing: .02em;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: var(--transition);
+  margin-bottom: 18px; margin-top: 8px; display: inline-flex;
+}
+.fd-back:hover { color: var(--accent2); border-color: var(--border); background: var(--bg3); }
+.fd-back::before { content: '←'; font-size: 14px; }
+
+/* ── HERO HEADER ──────────────────────────────────── */
+.fd-hero {
+  position: relative;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px 24px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.fd-hero::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 50%, transparent 100%);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+/* severity stripe on left */
+.fd-hero::after {
+  content: '';
+  position: absolute; top: 3px; left: 0; bottom: 0; width: 3px;
+  border-radius: 0 0 0 var(--radius-lg);
+}
+.fd-hero.sev-critical::after { background: var(--critical); }
+.fd-hero.sev-high::after     { background: var(--high); }
+.fd-hero.sev-medium::after   { background: var(--medium); }
+.fd-hero.sev-low::after      { background: var(--low); }
+.fd-hero.sev-info::after     { background: var(--muted); }
+
+.fd-hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.fd-title {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.5vw, 26px);
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 10px 0 14px;
+  letter-spacing: -.02em;
+}
+.fd-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* ── META PILLS ROW ───────────────────────────────── */
+.meta-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.meta-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: var(--font-body);
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.meta-pill strong { color: var(--text); font-weight: 500; }
+.meta-pill.mono, .meta-pill.mono strong { font-family: var(--font-mono); font-size: 11px; }
+.meta-pill.program-pill {
+  border-color: rgba(138,122,255,.3);
+  background: rgba(138,122,255,.1);
+  color: var(--accent2);
+}
+.meta-pill.program-pill strong { color: var(--accent2); }
+
+/* ── STATS STRIP ──────────────────────────────────── */
+.fd-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.fd-stat {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  position: relative;
+  transition: var(--transition);
+  overflow: hidden;
+}
+.fd-stat:hover { border-color: var(--border2); transform: translateY(-1px); box-shadow: var(--shadow-glow); }
+.fd-stat-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted);
+  font-family: var(--font-mono);
+  margin-bottom: 8px;
+}
+.fd-stat-value { font-size: 14px; font-weight: 500; font-family: var(--font-body); }
+.fd-stat-value.mono-val { font-family: var(--font-mono); font-size: 12px; }
+.cvss-big {
+  font-family: var(--font-mono);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  display: block;
+}
+
+/* ── PROGRAM SWITCHER ─────────────────────────────── */
+.prog-switcher-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#program-switch {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--radius-sm);
+  padding: 5px 8px; font-size: 11.5px; font-family: var(--font-mono);
+  cursor: pointer; transition: var(--transition);
+}
+#program-switch:hover { border-color: var(--accent2); }
+
+/* ── STATUS UPDATE BAR ────────────────────────────── */
+.fd-status-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+.fd-status-bar .bar-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.fd-status-bar select {
+  flex: 1; min-width: 160px; max-width: 260px;
+  padding: 7px 10px; font-size: 13px; border-radius: var(--radius-sm);
+}
+.fd-status-bar .btn { flex-shrink: 0; }
+
+/* ── MAIN CARD + TABS ─────────────────────────────── */
+.fd-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 8px;
+  background: rgba(0,0,0,.12);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 13px 16px;
+  font-size: 12.5px; font-weight: 500;
+  background: none; border: none; color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: var(--transition);
+  font-family: var(--font-body);
+  white-space: nowrap;
+  position: relative;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  color: var(--accent2);
+  border-bottom-color: var(--accent2);
+}
+.tab-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  background: rgba(124,106,255,.18);
+  color: var(--accent2);
+  border-radius: 20px;
+  font-size: 10px; font-weight: 600;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.tab-panel {
+  display: none;
+  padding: 24px 28px;
+  animation: fdFadeUp .22s ease-out both;
+}
+.tab-panel.active { display: block; }
+@keyframes fdFadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── SECTION LABEL ────────────────────────────────── */
+.section-label {
+  font-size: 10.5px; color: var(--muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .07em;
+  font-family: var(--font-mono);
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-label::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ── MARKDOWN CONTENT ─────────────────────────────── */
+.md-body { font-size: 14px; line-height: 1.75; color: var(--text); font-family: var(--font-body); }
+.md-body h1,.md-body h2,.md-body h3 { font-family: var(--font-display); }
+.md-body code { font-family: var(--font-mono); font-size: 12px; }
+.md-body pre { border-radius: var(--radius-md); }
+
+/* ── EVIDENCE GRID ────────────────────────────────── */
+.evidence-grid, .attachment-grid, .related-grid, .gap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.evidence-card, .attachment-card, .related-card, .gap-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  transition: var(--transition);
+}
+.evidence-card:hover, .related-card:hover { border-color: var(--border2); box-shadow: var(--shadow-glow); }
+.attachment-card:hover { border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(138,122,255,.2); }
+
+pre.code-block {
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  background: rgba(0,0,0,.22);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+/* ── ATTACHMENT CARD ──────────────────────────────── */
+.att-top { display: flex; align-items: center; gap: 10px; }
+.att-icon { font-size: 22px; flex-shrink: 0; }
+.att-name { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-name a, .related-card a { color: var(--accent2); text-decoration: none; }
+.att-name a:hover, .related-card a:hover { text-decoration: underline; }
+
+/* ── REPORT GRID ──────────────────────────────────── */
+.report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .report-grid { grid-template-columns: 1fr; } }
+.report-box, .hyp-box, .summary-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+}
+
+/* ── NOTE TIMELINE ────────────────────────────────── */
+.note-timeline { position: relative; padding-left: 20px; }
+.note-timeline::before {
+  content: ''; position: absolute; left: 5px; top: 10px; bottom: 10px;
+  width: 2px; background: linear-gradient(to bottom, var(--accent), transparent);
+  border-radius: 2px;
+}
+.note-entry {
+  position: relative;
+  margin-bottom: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  transition: var(--transition);
+}
+.note-entry:hover { border-color: var(--border2); }
+.note-entry::before {
+  content: ''; position: absolute; left: -17px; top: 18px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--bg3);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+/* ── ADD NOTE BOX ─────────────────────────────────── */
+.add-note-box {
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-top: 18px;
+  transition: var(--transition);
+}
+.add-note-box:hover { border-color: var(--accent2); }
+.add-note-box textarea {
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+/* ── HYPOTHESIS BOX ───────────────────────────────── */
+.hyp-box { border-left: 3px solid var(--accent2); }
+
+/* ── DANGER ZONE ──────────────────────────────────── */
+.danger-zone {
+  border: 1px solid rgba(255,77,109,.18);
+  background: rgba(255,77,109,.03);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-top: 20px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+.danger-zone h3 {
+  font-size: 12px; color: var(--critical);
+  font-family: var(--font-mono);
+  font-weight: 600; letter-spacing: .04em; margin: 0;
+}
+
+/* ── HELPERS ──────────────────────────────────────── */
+.stack { display: grid; gap: 14px; }
+.tiny { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.mono-tiny { font-size: 11px; color: var(--muted); font-family: var(--font-mono); word-break: break-all; }
+.text-muted { color: var(--muted); font-size: 13px; }
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 40px 20px; color: var(--muted); gap: 8px; text-align: center;
+}
+.empty-state .es-icon { font-size: 32px; opacity: .4; }
+.empty-state .es-text { font-size: 13px; font-family: var(--font-mono); }
+
+/* ── RESPONSIVE FIXES ─────────────────────────────── */
+@media (max-width: 640px) {
+  .tab-panel { padding: 18px 16px; }
+  .fd-hero { padding: 20px 18px 18px; }
+  .fd-title { font-size: 18px; }
+  .fd-stats { grid-template-columns: repeat(2, 1fr); }
+  .evidence-grid, .attachment-grid, .related-grid { grid-template-columns: 1fr; }
+}
+
+/* ── TOOLTIP HELPER ───────────────────────────────── */
+[data-tip] { position: relative; cursor: default; }
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px; font-size: 11px;
+  color: var(--text); white-space: nowrap; z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+
+/* ── COPY BUTTON ──────────────────────────────────── */
+.copy-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-family: var(--font-mono);
+  color: var(--muted); background: none; border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 7px; cursor: pointer;
+  transition: var(--transition);
+}
+.copy-btn:hover { color: var(--accent2); border-color: var(--accent2); }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container">
-  <div class="detail-header">
-    <div class="detail-header-main">
-      <a href="{{ url_for('findings.list_findings') }}" class="text-muted" style="font-size:13px;text-decoration:none">← Findings</a>
-      <div class="detail-title" style="margin-top:8px">{{ finding.title }}</div>
-      <div class="meta-row">
-        <span class="badge badge-{{ finding.severity }}">{{ finding.severity }}</span>
-        {% set sc = finding.status.replace('/','').replace('-','') %}
-        <span class="badge badge-{{ sc }}">{{ finding.status }}</span>
-        <span class="meta-pill mono"><strong>{{ finding.agent }}</strong></span>
-        <span class="meta-pill"><strong>{{ finding.target }}</strong></span>
-        <span class="meta-pill">{{ finding.platform }}</span>
-        {% if finding.cwe %}<span class="meta-pill mono"><strong>{{ finding.cwe }}</strong></span>{% endif %}
-        {% if finding.hypothesis %}
-          <span class="meta-pill">🔗 <strong>hypothesis #{{ finding.hypothesis.id }}</strong></span>
-        {% endif %}
-        {% if finding.program %}
-        <span class="meta-pill program-pill">
-          📋 <a href="{{ url_for('programs.detail', pid=finding.program.id) }}" style="color:var(--accent2);text-decoration:none"><strong>{{ finding.program.name }}</strong></a>
-        </span>
-        {% endif %}
+<div class="fd-page">
+
+  <!-- ── BACK LINK ── -->
+  <a href="{{ url_for('findings.list_findings') }}" class="fd-back">Findings</a>
+
+  <!-- ── HERO HEADER ── -->
+  {% set sev_cls = 'sev-' + finding.severity|lower %}
+  <div class="fd-hero {{ sev_cls }}">
+    <div class="fd-hero-top">
+      <div style="flex:1;min-width:0">
+        <div class="meta-row">
+          <span class="badge badge-{{ finding.severity }}">{{ finding.severity }}</span>
+          {% set sc = finding.status.replace('/','').replace('-','') %}
+          <span class="badge badge-{{ sc }}">{{ finding.status }}</span>
+          <span class="meta-pill mono"><strong>{{ finding.agent }}</strong></span>
+          <span class="meta-pill">{{ finding.platform }}</span>
+          {% if finding.cwe %}<span class="meta-pill mono" data-tip="{{ finding.cwe }}"><strong>{{ finding.cwe }}</strong></span>{% endif %}
+          {% if finding.hypothesis %}
+            <span class="meta-pill">🔗 <strong>hypothesis #{{ finding.hypothesis.id }}</strong></span>
+          {% endif %}
+          {% if finding.program %}
+          <span class="meta-pill program-pill">
+            📋 <a href="{{ url_for('programs.detail', pid=finding.program.id) }}" style="color:var(--accent2);text-decoration:none"><strong>{{ finding.program.name }}</strong></a>
+          </span>
+          {% endif %}
+        </div>
+        <div class="fd-title">{{ finding.title }}</div>
+        <div class="meta-row">
+          <span class="meta-pill">🎯 <strong>{{ finding.target }}</strong></span>
+        </div>
       </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-shrink:0">
-      <a href="{{ url_for('findings.edit_finding', fid=finding.id) }}" class="btn btn-ghost">Edit</a>
+      <div class="fd-actions">
+        <a href="{{ url_for('findings.edit_finding', fid=finding.id) }}" class="btn btn-ghost">✏ Edit</a>
+      </div>
     </div>
   </div>
 
-  <div class="info-grid">
+  <!-- ── STATS STRIP ── -->
+  <div class="fd-stats">
     {% if finding.cvss %}
-    <div class="info-box">
-      <div class="ib-label">CVSS Score</div>
-      <div class="ib-value">
-        {% if finding.cvss >= 9 %}
-          <span class="cvss-big" style="color:var(--critical)">{{ "%.1f"|format(finding.cvss) }}</span>
-        {% elif finding.cvss >= 7 %}
-          <span class="cvss-big" style="color:var(--high)">{{ "%.1f"|format(finding.cvss) }}</span>
-        {% elif finding.cvss >= 4 %}
-          <span class="cvss-big" style="color:var(--medium)">{{ "%.1f"|format(finding.cvss) }}</span>
-        {% else %}
-          <span class="cvss-big" style="color:var(--low)">{{ "%.1f"|format(finding.cvss) }}</span>
-        {% endif %}
-      </div>
+    <div class="fd-stat">
+      <div class="fd-stat-label">CVSS Score</div>
+      {% if finding.cvss >= 9 %}
+        <span class="cvss-big" style="color:var(--critical)">{{ "%.1f"|format(finding.cvss) }}</span>
+      {% elif finding.cvss >= 7 %}
+        <span class="cvss-big" style="color:var(--high)">{{ "%.1f"|format(finding.cvss) }}</span>
+      {% elif finding.cvss >= 4 %}
+        <span class="cvss-big" style="color:var(--medium)">{{ "%.1f"|format(finding.cvss) }}</span>
+      {% else %}
+        <span class="cvss-big" style="color:var(--low)">{{ "%.1f"|format(finding.cvss) }}</span>
+      {% endif %}
     </div>
     {% endif %}
-    <div class="info-box">
-      <div class="ib-label">Confidence</div>
-      <div class="ib-value">{{ finding.confidence }}</div>
+    <div class="fd-stat">
+      <div class="fd-stat-label">Confidence</div>
+      <div class="fd-stat-value">{{ finding.confidence }}</div>
     </div>
-    <div class="info-box">
-      <div class="ib-label">Structured Evidence</div>
-      <div class="ib-value">{{ finding.evidence_records|length }}</div>
+    <div class="fd-stat">
+      <div class="fd-stat-label">Evidence</div>
+      <div class="fd-stat-value">{{ finding.evidence_records|length }} record{{ 's' if finding.evidence_records|length != 1 }}</div>
     </div>
-    <div class="info-box">
-      <div class="ib-label">Attachments</div>
-      <div class="ib-value">{{ finding.attachments|length }}</div>
+    <div class="fd-stat">
+      <div class="fd-stat-label">Attachments</div>
+      <div class="fd-stat-value">{{ finding.attachments|length }} file{{ 's' if finding.attachments|length != 1 }}</div>
     </div>
-    <div class="info-box">
-      <div class="ib-label">Created</div>
-      <div class="ib-value mono" style="font-size:12px">{{ finding.created_at.strftime('%Y-%m-%d %H:%M') if finding.created_at else '—' }}</div>
+    <div class="fd-stat">
+      <div class="fd-stat-label">Created</div>
+      <div class="fd-stat-value mono-val">{{ finding.created_at.strftime('%Y-%m-%d') if finding.created_at else '—' }}</div>
     </div>
-    <div class="info-box">
-      <div class="ib-label">Last Updated</div>
-      <div class="ib-value mono" style="font-size:12px">{{ finding.updated_at.strftime('%Y-%m-%d %H:%M') if finding.updated_at else '—' }}</div>
+    <div class="fd-stat">
+      <div class="fd-stat-label">Updated</div>
+      <div class="fd-stat-value mono-val">{{ finding.updated_at.strftime('%Y-%m-%d %H:%M') if finding.updated_at else '—' }}</div>
     </div>
-    <div class="info-box">
-      <div class="ib-label">Program</div>
-      <div class="ib-value">
+    <div class="fd-stat" style="grid-column: span 2">
+      <div class="fd-stat-label">Program</div>
+      <div class="prog-switcher-wrap">
         {% if finding.program %}
-          <span style="font-size:13px">{{ finding.program.name }}</span>
+          <span style="font-size:13px;font-weight:500">{{ finding.program.name }}</span>
         {% else %}
-          <span class="text-muted" style="font-size:12px">Not linked</span>
+          <span class="tiny">Not linked</span>
         {% endif %}
-        <form method="POST" action="{{ url_for('findings.update_program', fid=finding.id) }}" style="display:inline;margin-left:8px" id="program-form">
+        <form method="POST" action="{{ url_for('findings.update_program', fid=finding.id) }}" id="program-form">
           <select name="program_id" id="program-switch" onchange="this.form.submit()">
             <option value="">— None —</option>
             {% for p in programs %}
@@ -189,53 +477,70 @@
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:20px">
-    <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Update Status</div>
-    <form method="POST" action="{{ url_for('findings.update_status', fid=finding.id) }}" class="status-form">
-      <select name="status">
-        {% for s in statuses %}
-        <option value="{{ s }}" {{ 'selected' if finding.status == s }}>{{ s }}</option>
-        {% endfor %}
-      </select>
-      <button type="submit" class="btn btn-primary btn-sm">Update →</button>
-    </form>
-  </div>
+  <!-- ── STATUS BAR ── -->
+  <form method="POST" action="{{ url_for('findings.update_status', fid=finding.id) }}" class="fd-status-bar">
+    <span class="bar-label">Status</span>
+    <select name="status">
+      {% for s in statuses %}
+      <option value="{{ s }}" {{ 'selected' if finding.status == s }}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">Update →</button>
+  </form>
 
-  <div class="card">
+  <!-- ── MAIN CARD ── -->
+  <div class="fd-card">
     <div class="tabs">
-      <button class="tab-btn active" onclick="showTab('description', this)">Description</button>
-      <button class="tab-btn" onclick="showTab('poc', this)">PoC / Steps</button>
-      <button class="tab-btn" onclick="showTab('hypothesis', this)">Linked Hypothesis</button>
+      <button class="tab-btn active" onclick="showTab('description', this)">📄 Description</button>
+      <button class="tab-btn" onclick="showTab('poc', this)">⚡ PoC / Steps</button>
+      <button class="tab-btn" onclick="showTab('hypothesis', this)">🔗 Hypothesis</button>
       {% set evidence_total = (finding.evidence_records|length) + (report_pack.hypothesis_evidence|length) %}
-      <button class="tab-btn" onclick="showTab('evidence', this)" id="evidence-tab-btn">Evidence{% if evidence_total %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ evidence_total }}</span>{% endif %}</button>
-      <button class="tab-btn" onclick="showTab('report', this)" id="report-tab-btn">Report Pack</button>
-      <button class="tab-btn" onclick="showTab('attachments', this)">Attachments{% if finding.attachments %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ finding.attachments|length }}</span>{% endif %}</button>
-      <button class="tab-btn" onclick="showTab('related', this)">Related Work</button>
-      <button class="tab-btn" onclick="showTab('notes', this)" id="notes-tab-btn">Notes{% if finding.notes %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ finding.notes|length }}</span>{% endif %}</button>
+      <button class="tab-btn" onclick="showTab('evidence', this)" id="evidence-tab-btn">
+        🧪 Evidence{% if evidence_total %}<span class="tab-badge">{{ evidence_total }}</span>{% endif %}
+      </button>
+      <button class="tab-btn" onclick="showTab('report', this)" id="report-tab-btn">📊 Report Pack</button>
+      <button class="tab-btn" onclick="showTab('attachments', this)">
+        📎 Attachments{% if finding.attachments %}<span class="tab-badge">{{ finding.attachments|length }}</span>{% endif %}
+      </button>
+      <button class="tab-btn" onclick="showTab('related', this)">🔍 Related</button>
+      <button class="tab-btn" onclick="showTab('notes', this)" id="notes-tab-btn">
+        💬 Notes{% if finding.notes %}<span class="tab-badge">{{ finding.notes|length }}</span>{% endif %}
+      </button>
     </div>
 
+    <!-- DESCRIPTION -->
     <div id="tab-description" class="tab-panel active">
       {% if finding.description %}
         <div class="md-body" id="md-description">{{ finding.description }}</div>
       {% else %}
-        <div class="text-muted">No description.</div>
+        <div class="empty-state">
+          <div class="es-icon">📝</div>
+          <div class="es-text">No description yet.</div>
+        </div>
       {% endif %}
     </div>
 
+    <!-- POC -->
     <div id="tab-poc" class="tab-panel">
       {% if finding.poc %}
         <div class="md-body" id="md-poc">{{ finding.poc }}</div>
       {% else %}
-        <div class="text-muted">No PoC written yet.</div>
+        <div class="empty-state">
+          <div class="es-icon">⚡</div>
+          <div class="es-text">No PoC written yet.</div>
+        </div>
       {% endif %}
     </div>
 
+    <!-- HYPOTHESIS -->
     <div id="tab-hypothesis" class="tab-panel">
       {% if report_pack.linked_hypothesis %}
         <div class="hyp-box">
-          <div class="section-label">Summary</div>
-          <div style="font-weight:600;font-size:16px">{{ report_pack.linked_hypothesis.title }}</div>
-          <div class="meta-row" style="margin-top:8px">
+          <div class="section-label">Linked Hypothesis</div>
+          <div style="font-family:var(--font-display);font-size:18px;font-weight:700;letter-spacing:-.01em">
+            {{ report_pack.linked_hypothesis.title }}
+          </div>
+          <div class="meta-row" style="margin-top:10px">
             {% if report_pack.linked_hypothesis.weakness_hint %}<span class="meta-pill">{{ report_pack.linked_hypothesis.weakness_hint }}</span>{% endif %}
             {% if report_pack.linked_hypothesis.cwe %}<span class="meta-pill mono"><strong>{{ report_pack.linked_hypothesis.cwe }}</strong></span>{% endif %}
             {% if report_pack.linked_hypothesis.severity_hint %}<span class="badge badge-{{ report_pack.linked_hypothesis.severity_hint }}">{{ report_pack.linked_hypothesis.severity_hint }}</span>{% endif %}
@@ -243,19 +548,23 @@
             <span class="meta-pill">{{ report_pack.linked_hypothesis.status }}</span>
           </div>
           {% if report_pack.linked_hypothesis.attack_path %}
-            <div class="section-label" style="margin-top:14px">Attack Path</div>
+            <div class="section-label" style="margin-top:20px">Attack Path</div>
             <div class="md-body hyp-md">{{ report_pack.linked_hypothesis.attack_path }}</div>
           {% endif %}
           {% if report_pack.linked_hypothesis.impact_hypothesis %}
-            <div class="section-label" style="margin-top:14px">Impact Hypothesis</div>
+            <div class="section-label" style="margin-top:20px">Impact Hypothesis</div>
             <div class="md-body hyp-md">{{ report_pack.linked_hypothesis.impact_hypothesis }}</div>
           {% endif %}
         </div>
       {% else %}
-        <div class="text-muted">This finding is not linked to a hypothesis.</div>
+        <div class="empty-state">
+          <div class="es-icon">🔗</div>
+          <div class="es-text">Not linked to a hypothesis.</div>
+        </div>
       {% endif %}
     </div>
 
+    <!-- EVIDENCE -->
     <div id="tab-evidence" class="tab-panel">
       {% if finding.evidence_records or report_pack.hypothesis_evidence %}
         <div class="stack">
@@ -265,14 +574,18 @@
               <div class="evidence-grid">
                 {% for evidence in finding.evidence_records %}
                   <div class="evidence-card">
-                    <div style="font-weight:600">{{ evidence.title }}</div>
+                    <div style="font-weight:600;font-size:13.5px">{{ evidence.title }}</div>
                     <div class="meta-row" style="margin-top:8px">
                       <span class="meta-pill">{{ evidence.evidence_type }}</span>
                       {% if evidence.request_method %}<span class="meta-pill mono"><strong>{{ evidence.request_method }}</strong></span>{% endif %}
                       {% if evidence.response_status %}<span class="meta-pill">HTTP {{ evidence.response_status }}</span>{% endif %}
                     </div>
                     {% if evidence.summary %}<div class="tiny" style="margin-top:8px">{{ evidence.summary }}</div>{% endif %}
-                    {% if evidence.request_url %}<div class="mono-tiny" style="margin-top:8px">{{ evidence.request_url }}</div>{% endif %}
+                    {% if evidence.request_url %}
+                      <div class="mono-tiny" style="margin-top:8px">{{ evidence.request_url }}
+                        <button class="copy-btn" onclick="copyText('{{ evidence.request_url }}', this)">⎘ copy</button>
+                      </div>
+                    {% endif %}
                     {% if evidence.request_body_text %}<pre class="code-block">{{ evidence.request_body_text }}</pre>{% endif %}
                     {% if evidence.response_body_text %}<pre class="code-block">{{ evidence.response_body_text }}</pre>{% endif %}
                   </div>
@@ -282,18 +595,20 @@
           {% endif %}
           {% if report_pack.hypothesis_evidence %}
             <div>
-              <div class="section-label">Linked Hypothesis Evidence</div>
+              <div class="section-label">Hypothesis Evidence</div>
               <div class="evidence-grid">
                 {% for evidence in report_pack.hypothesis_evidence %}
                   <div class="evidence-card">
-                    <div style="font-weight:600">{{ evidence.title }}</div>
+                    <div style="font-weight:600;font-size:13.5px">{{ evidence.title }}</div>
                     <div class="meta-row" style="margin-top:8px">
                       <span class="meta-pill">{{ evidence.evidence_type }}</span>
                       {% if evidence.request_method %}<span class="meta-pill mono"><strong>{{ evidence.request_method }}</strong></span>{% endif %}
                       {% if evidence.response_status %}<span class="meta-pill">HTTP {{ evidence.response_status }}</span>{% endif %}
                     </div>
                     {% if evidence.summary %}<div class="tiny" style="margin-top:8px">{{ evidence.summary }}</div>{% endif %}
-                    {% if evidence.request_url %}<div class="mono-tiny" style="margin-top:8px">{{ evidence.request_url }}</div>{% endif %}
+                    {% if evidence.request_url %}
+                      <div class="mono-tiny" style="margin-top:8px">{{ evidence.request_url }}</div>
+                    {% endif %}
                     {% if evidence.request_body_text %}<pre class="code-block">{{ evidence.request_body_text }}</pre>{% endif %}
                     {% if evidence.response_body_text %}<pre class="code-block">{{ evidence.response_body_text }}</pre>{% endif %}
                   </div>
@@ -303,23 +618,29 @@
           {% endif %}
         </div>
       {% else %}
-        <div class="text-muted">No structured evidence records yet.</div>
+        <div class="empty-state">
+          <div class="es-icon">🧪</div>
+          <div class="es-text">No structured evidence records yet.</div>
+        </div>
       {% endif %}
     </div>
 
+    <!-- REPORT PACK -->
     <div id="tab-report" class="tab-panel">
       <div class="report-grid">
         <div class="stack">
           <div class="report-box">
             <div class="section-label">Report Summary</div>
             <div class="summary-card">
-              <div><strong>Title:</strong> {{ finding.title }}</div>
-              <div class="tiny" style="margin-top:6px"><strong>Target:</strong> {{ finding.target }}</div>
-              <div class="tiny" style="margin-top:6px"><strong>Severity:</strong> {{ finding.severity }}</div>
-              <div class="tiny" style="margin-top:6px"><strong>Confidence:</strong> {{ finding.confidence }}</div>
-              {% if finding.cwe or report_pack.linked_hypothesis %}
-                <div class="tiny" style="margin-top:6px"><strong>CWE:</strong> {{ finding.cwe or report_pack.linked_hypothesis.cwe }}</div>
-              {% endif %}
+              <div style="font-weight:600;font-size:14px">{{ finding.title }}</div>
+              <div class="tiny" style="margin-top:8px">
+                <strong>Target:</strong> {{ finding.target }}<br>
+                <strong>Severity:</strong> {{ finding.severity }}<br>
+                <strong>Confidence:</strong> {{ finding.confidence }}<br>
+                {% if finding.cwe or report_pack.linked_hypothesis %}
+                <strong>CWE:</strong> {{ finding.cwe or report_pack.linked_hypothesis.cwe }}
+                {% endif %}
+              </div>
             </div>
           </div>
           <div class="report-box">
@@ -341,31 +662,34 @@
             {% if report_pack.unresolved_gaps %}
               <div class="gap-grid">
                 {% for gap in report_pack.unresolved_gaps %}
-                  <div class="gap-card">{{ gap }}</div>
+                  <div class="gap-card" style="font-size:12.5px;color:var(--text)">⚠ {{ gap }}</div>
                 {% endfor %}
               </div>
             {% else %}
-              <div class="tiny">No obvious report-prep gaps detected.</div>
+              <div class="tiny" style="color:var(--low)">✓ No obvious gaps detected.</div>
             {% endif %}
           </div>
           <div class="report-box">
             <div class="section-label">Evidence Inventory</div>
-            <div class="tiny">Finding evidence: {{ report_pack.finding_evidence|length }}</div>
-            <div class="tiny" style="margin-top:6px">Hypothesis evidence: {{ report_pack.hypothesis_evidence|length }}</div>
-            <div class="tiny" style="margin-top:6px">Attachments: {{ finding.attachments|length }}</div>
-            <div class="tiny" style="margin-top:6px">Notes: {{ finding.notes|length }}</div>
+            <div style="display:grid;gap:6px">
+              <div class="tiny">📄 Finding evidence: <strong>{{ report_pack.finding_evidence|length }}</strong></div>
+              <div class="tiny">🔗 Hypothesis evidence: <strong>{{ report_pack.hypothesis_evidence|length }}</strong></div>
+              <div class="tiny">📎 Attachments: <strong>{{ finding.attachments|length }}</strong></div>
+              <div class="tiny">💬 Notes: <strong>{{ finding.notes|length }}</strong></div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- ATTACHMENTS -->
     <div id="tab-attachments" class="tab-panel">
       {% if finding.attachments %}
         <div class="attachment-grid">
           {% for att in finding.attachments %}
           <div class="attachment-card">
-            <div style="display:flex;align-items:center;gap:10px">
-              <span class="attachment-icon">
+            <div class="att-top">
+              <span class="att-icon">
                 {% set ext = att.original_name.rsplit('.',1)[-1].lower() %}
                 {% if ext in ['png','jpg','jpeg','gif','webp'] %}🖼️
                 {% elif ext == 'pdf' %}📄
@@ -373,21 +697,25 @@
                 {% else %}📎{% endif %}
               </span>
               <div style="flex:1;min-width:0">
-                <div class="attachment-name"><a href="{{ url_for('findings.uploaded_file', filename=att.filename) }}" target="_blank">{{ att.original_name }}</a></div>
+                <div class="att-name"><a href="{{ url_for('findings.uploaded_file', filename=att.filename) }}" target="_blank">{{ att.original_name }}</a></div>
                 <div class="tiny">{{ att.uploaded_at.strftime('%Y-%m-%d') if att.uploaded_at else '' }}</div>
               </div>
             </div>
-            <form method="POST" action="{{ url_for('findings.delete_attachment', aid=att.id) }}" onsubmit="return confirm('Delete attachment?')" style="margin-top:10px">
-              <button type="submit" class="btn btn-danger btn-sm" title="Delete">Delete</button>
+            <form method="POST" action="{{ url_for('findings.delete_attachment', aid=att.id) }}" onsubmit="return confirm('Delete attachment?')" style="margin-top:12px;text-align:right">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
             </form>
           </div>
           {% endfor %}
         </div>
       {% else %}
-        <div class="text-muted" style="padding:20px 0">No attachments.</div>
+        <div class="empty-state">
+          <div class="es-icon">📎</div>
+          <div class="es-text">No attachments.</div>
+        </div>
       {% endif %}
     </div>
 
+    <!-- RELATED -->
     <div id="tab-related" class="tab-panel">
       <div class="stack">
         <div>
@@ -407,7 +735,10 @@
               {% endfor %}
             </div>
           {% else %}
-            <div class="tiny">No related findings found.</div>
+            <div class="empty-state" style="padding:20px 0">
+              <div class="es-icon">🔍</div>
+              <div class="es-text">No related findings found.</div>
+            </div>
           {% endif %}
         </div>
         <div>
@@ -416,7 +747,7 @@
             <div class="related-grid">
               {% for related in related_work.hypotheses %}
                 <div class="related-card">
-                  <div style="font-weight:600">{{ related.title }}</div>
+                  <div style="font-weight:600;font-size:13px">{{ related.title }}</div>
                   <div class="meta-row" style="margin-top:8px">
                     {% if related.cwe %}<span class="meta-pill mono"><strong>{{ related.cwe }}</strong></span>{% endif %}
                     {% if related.severity_hint %}<span class="badge badge-{{ related.severity_hint }}">{{ related.severity_hint }}</span>{% endif %}
@@ -426,23 +757,27 @@
               {% endfor %}
             </div>
           {% else %}
-            <div class="tiny">No related hypotheses found.</div>
+            <div class="empty-state" style="padding:20px 0">
+              <div class="es-icon">🔗</div>
+              <div class="es-text">No related hypotheses found.</div>
+            </div>
           {% endif %}
         </div>
       </div>
     </div>
 
+    <!-- NOTES -->
     <div id="tab-notes" class="tab-panel">
       {% if finding.notes %}
         <div class="note-timeline">
           {% for note in finding.notes %}
           <div class="note-entry">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <span style="font-size:11px;font-family:var(--mono);color:var(--accent2)">{{ note.agent }}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:11px;font-family:var(--font-mono);color:var(--accent2);font-weight:600">{{ note.agent }}</span>
               <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:11px;color:var(--muted)">{{ note.created_at.strftime('%Y-%m-%d %H:%M') if note.created_at }}</span>
+                <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">{{ note.created_at.strftime('%Y-%m-%d %H:%M') if note.created_at }}</span>
                 <form method="POST" action="{{ url_for('settings.delete_note', nid=note.id) }}" onsubmit="return confirm('Delete note?')" style="display:inline">
-                  <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 7px">✕</button>
+                  <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px">✕</button>
                 </form>
               </div>
             </div>
@@ -451,36 +786,41 @@
           {% endfor %}
         </div>
       {% else %}
-        <div class="text-muted" style="margin-bottom:16px">No notes yet.</div>
+        <div class="empty-state" style="padding:24px 0">
+          <div class="es-icon">💬</div>
+          <div class="es-text">No notes yet. Add one below.</div>
+        </div>
       {% endif %}
 
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:16px">
-        <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">+ Add Note</div>
+      <div class="add-note-box">
+        <div class="section-label">+ Add Note</div>
         <form method="POST" action="{{ url_for('settings.add_note', fid=finding.id) }}">
           <div class="form-group">
-            <textarea name="content" rows="3" placeholder="Markdown supported…" style="resize:vertical"></textarea>
+            <textarea name="content" rows="4" placeholder="Markdown supported… add observations, next steps, or context"></textarea>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <select name="agent" style="width:auto;padding:7px 10px;font-size:13px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select name="agent" style="width:auto;padding:7px 10px;font-size:12.5px;font-family:var(--font-mono)">
               {% for a in ['manual','gemini-cli','claude-code','claude','codex','other'] %}
               <option value="{{ a }}">{{ a }}</option>
               {% endfor %}
             </select>
-            <button type="submit" class="btn btn-primary btn-sm">Add Note</button>
+            <button type="submit" class="btn btn-primary btn-sm">Add Note →</button>
           </div>
         </form>
       </div>
     </div>
-  </div>
+  </div><!-- /.fd-card -->
 
+  <!-- ── DANGER ZONE ── -->
   <div class="danger-zone">
     <h3>⚠ Danger Zone</h3>
     <form method="POST" action="{{ url_for('findings.delete_finding', fid=finding.id) }}"
-          onsubmit="return confirm('Delete this finding permanently?')">
+          onsubmit="return confirm('Permanently delete this finding? This cannot be undone.')">
       <button type="submit" class="btn btn-danger btn-sm">Delete Finding</button>
     </form>
   </div>
-</div>
+
+</div><!-- /.fd-page -->
 {% endblock %}
 
 {% block extra_scripts %}
@@ -488,6 +828,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
+  // ── Markdown rendering ──────────────────────────────
   marked.setOptions({ breaks: true, gfm: true });
   ['md-description', 'md-poc'].forEach(id => {
     const el = document.getElementById(id);
@@ -498,6 +839,7 @@
   });
   document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
 
+  // ── Tab switching ───────────────────────────────────
   function showTab(name, btn) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -505,14 +847,25 @@
     btn.classList.add('active');
   }
 
+  // ── URL hash deep-linking ───────────────────────────
   const hashToTab = {
-    '#notes': 'notes-tab-btn',
+    '#notes':    'notes-tab-btn',
     '#evidence': 'evidence-tab-btn',
-    '#report': 'report-tab-btn'
+    '#report':   'report-tab-btn'
   };
   const btnId = hashToTab[window.location.hash];
   if (btnId) {
     document.getElementById(btnId)?.click();
+  }
+
+  // ── Copy helper ─────────────────────────────────────
+  function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✓ copied';
+      btn.style.color = 'var(--low)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+    });
   }
 </script>
 {% endblock %}

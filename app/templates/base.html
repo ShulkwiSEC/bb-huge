@@ -26,7 +26,8 @@
       --low:      #6bbcff;
       --info:     #888;
 
-      --sidebar-width: 220px;
+      --sidebar-width: 230px;
+      --sidebar-collapsed-width: 80px;
       --container-px: 24px;
     }
 
@@ -80,7 +81,7 @@
       z-index: 2000;
       display: flex;
       flex-direction: column;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .sidebar-header {
@@ -101,10 +102,11 @@
       transition: transform 0.2s;
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
     }
     .sidebar-logo:hover { transform: scale(1.02); }
-    .sidebar-logo span { color: var(--muted); }
+    .sidebar-logo .logo-icon { font-size: 22px; flex-shrink: 0; }
+    .sidebar-logo .logo-text span { color: var(--muted); }
 
     .sidebar-close {
       display: none;
@@ -140,9 +142,17 @@
       color: var(--muted);
     }
 
+    .sidebar-body {
+      flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .sidebar-body::-webkit-scrollbar { width: 4px; }
+    .sidebar-body::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .sidebar-body::-webkit-scrollbar-thumb:hover { background: var(--border2); }
+
     .sidebar-nav {
-      flex: 1;
-      padding: 8px 12px;
+      padding: 8px 12px 4px;
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -156,6 +166,16 @@
       font-weight: 500;
       border-left: 2px solid transparent;
       transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sidebar-nav .nav-icon { flex-shrink: 0; font-size: 16px; line-height: 1; }
+    .sidebar-nav .nav-label { flex: 1; min-width: 0; }
+    .sidebar-nav .nav-badge {
+      flex-shrink: 0; padding: 1px 6px; border-radius: 4px;
+      font-family: var(--mono); font-size: 10px; font-weight: 600;
+      line-height: 1.4; margin-left: auto;
     }
     .sidebar-nav a:hover {
       background: rgba(255, 255, 255, 0.04);
@@ -175,6 +195,93 @@
       gap: 8px;
     }
     .sidebar-footer .btn-add { width: 100%; text-align: center; justify-content: center; padding: 10px; }
+
+    /* ── SIDEBAR COLLAPSED ── */
+    .sidebar.collapsed { width: var(--sidebar-collapsed-width); }
+    .sidebar.collapsed ~ .main-content { margin-left: var(--sidebar-collapsed-width); }
+    .sidebar.collapsed .logo-text,
+    .sidebar.collapsed .sidebar-search input,
+    .sidebar.collapsed .nav-label,
+    .sidebar.collapsed .nav-badge,
+    .sidebar.collapsed .sidebar-section,
+    .sidebar.collapsed .sidebar-stats .stat-num,
+    .sidebar.collapsed .sidebar-footer .btn-text,
+    .sidebar.collapsed .sidebar-footer .kbd-hint,
+    .sidebar.collapsed .sidebar-footer .btn-ghost .btn-text,
+    .sidebar.collapsed .sidebar-header .sidebar-close { display: none; }
+    .sidebar.collapsed .sidebar-nav a { justify-content: center; padding: 10px 0; border-left: none; }
+    .sidebar.collapsed .sidebar-nav a.active { border-left: none; border-right: 2px solid var(--accent); }
+    .sidebar.collapsed .sidebar-search { padding: 8px; }
+    .sidebar.collapsed .sidebar-search input { width: 0; padding: 0; border: none; }
+    .sidebar.collapsed .sidebar-search::before {
+      content: "🔍"; display: block; text-align: center; font-size: 16px; cursor: pointer;
+    }
+    .sidebar.collapsed .sidebar-stats { flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
+    .sidebar.collapsed .sidebar-stats .sidebar-stat { gap: 0; }
+    .sidebar.collapsed .sidebar-stats .stat-icon { font-size: 16px; }
+    .sidebar.collapsed .sidebar-body { overflow-y: visible; }
+    .sidebar.collapsed .sidebar-footer { padding: 6px 0; align-items: center; }
+    .sidebar.collapsed .sidebar-footer .btn-add { width: 36px; height: 36px; padding: 0; border-radius: 8px; min-width: 0; }
+    .sidebar.collapsed .sidebar-footer .btn-ghost { width: 36px; height: 36px; padding: 0; justify-content: center; min-width: 0; }
+
+    .sidebar-collapse-btn {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 12px; padding: 4px 6px; line-height: 1; border-radius: 4px;
+      transition: 0.15s; display: block;
+    }
+    .sidebar-collapse-btn:hover { color: var(--text); background: var(--bg3); }
+    .sidebar.collapsed .sidebar-collapse-btn { transform: rotate(180deg); }
+
+    /* ── SIDEBAR SECTIONS (accordion) ── */
+    .sidebar-section {
+      border-top: 1px solid rgba(42,42,58,.5);
+      margin: 6px 0 0;
+    }
+    .sidebar-section .section-header {
+      display: flex; align-items: center; gap: 7px;
+      padding: 10px 14px 10px 12px;
+      font-size: 10px; font-weight: 700; cursor: pointer;
+      color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+      user-select: none; transition: 0.12s;
+    }
+    .sidebar-section .section-header:hover { color: var(--text); background: rgba(255,255,255,.02); }
+    .sidebar-section .section-icon { font-size: 12px; flex-shrink: 0; }
+    .sidebar-section .section-arrow {
+      margin-left: auto; font-size: 8px; transition: transform 0.2s;
+      color: var(--border2); flex-shrink: 0;
+    }
+    .sidebar-section.collapsed .section-arrow { transform: rotate(-90deg); }
+    .sidebar-section .section-items {
+      display: flex; flex-direction: column; gap: 1px;
+      overflow: hidden; transition: max-height 0.2s ease;
+      max-height: 500px; padding: 0 8px 4px;
+    }
+    .sidebar-section.collapsed .section-items { max-height: 0; padding-bottom: 0; }
+    .sidebar-section .section-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 8px; border-radius: 5px; text-decoration: none; color: var(--text);
+      font-size: 12px; line-height: 1.3; transition: 0.1s; min-width: 0;
+    }
+    .sidebar-section .section-item:hover { background: rgba(255,255,255,.04); }
+    .sidebar-section .item-text {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+    }
+    .sidebar-section .item-badge {
+      flex-shrink: 0; font-family: var(--mono); font-size: 9px; font-weight: 600;
+      padding: 1px 5px; border-radius: 4px; line-height: 1.4;
+      background: rgba(255,255,255,.04); color: var(--muted);
+    }
+    .sidebar-section .item-badge.crit { background: rgba(255,77,109,.15); color: var(--critical); }
+    .sidebar-section .item-badge.high { background: rgba(255,154,60,.12); color: var(--high); }
+
+    /* ── SIDEBAR MINI STATS ── */
+    .sidebar-stats {
+      display: flex; align-items: center; gap: 14px;
+      padding: 8px 16px 10px; flex-shrink: 0;
+    }
+    .sidebar-stats .sidebar-stat { display: flex; align-items: center; gap: 4px; cursor: default; }
+    .sidebar-stats .stat-icon { font-size: 13px; flex-shrink: 0; }
+    .sidebar-stats .stat-num { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--muted); }
 
     /* ── HAMBURGER ── */
     .hamburger {
@@ -220,6 +327,7 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .container {
@@ -518,8 +626,10 @@
 
     /* ── MOBILE ── */
     @media (max-width: 900px) {
-      .sidebar { transform: translateX(-100%); }
+      .sidebar { transform: translateX(-100%); width: var(--sidebar-width); }
       .sidebar.active { transform: translateX(0); }
+      .sidebar.collapsed { width: var(--sidebar-width); }
+      .sidebar-collapse-btn { display: none; }
       .sidebar-close { display: block; }
       .sidebar-overlay.active { display: block; }
       .hamburger { display: block; }
@@ -558,7 +668,11 @@
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    <a class="sidebar-logo" href="{{ url_for('findings.dashboard') }}">bb<span>-</span>huge 🤗</a>
+    <a class="sidebar-logo" href="{{ url_for('findings.dashboard') }}">
+      <span class="logo-icon">🤗</span>
+      <span class="logo-text">bb<span>-</span>huge</span>
+    </a>
+    <button class="sidebar-collapse-btn" id="sidebar-collapse" aria-label="Toggle sidebar" title="Collapse sidebar">◀</button>
     <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">✕</button>
   </div>
 
@@ -566,22 +680,110 @@
     <input type="text" id="sidebar-search" placeholder="Search findings …" enterkeyhint="search">
   </div>
 
-  <nav class="sidebar-nav">
-    <a href="{{ url_for('findings.dashboard') }}"
-       class="{{ 'active' if request.endpoint == 'findings.dashboard' }}">Dashboard</a>
-    <a href="{{ url_for('programs.list_programs') }}"
-       class="{{ 'active' if request.blueprint == 'programs' }}">Programs</a>
-    <a href="{{ url_for('findings.list_findings') }}"
-       class="{{ 'active' if request.endpoint in ['findings.list_findings', 'findings.detail'] }}">Findings</a>
-    <a href="{{ url_for('settings.index') }}"
-       class="{{ 'active' if request.blueprint == 'settings' }}">Settings</a>
-  </nav>
+  <div class="sidebar-body">
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('findings.dashboard') }}"
+         class="{{ 'active' if request.endpoint == 'findings.dashboard' }}">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Dashboard</span>
+      </a>
+      <a href="{{ url_for('programs.list_programs') }}"
+         class="{{ 'active' if request.blueprint == 'programs' }}">
+        <span class="nav-icon">📁</span>
+        <span class="nav-label">Programs</span>
+        {% if sidebar_crit > 0 %}<span class="nav-badge badge-critical">{{ sidebar_crit }}</span>{% endif %}
+      </a>
+      <a href="{{ url_for('findings.list_findings') }}"
+         class="{{ 'active' if request.endpoint in ['findings.list_findings', 'findings.detail'] }}">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">Findings</span>
+        {% if sidebar_confirmed > 0 %}<span class="nav-badge badge-confirmed" style="font-size:10px">{{ sidebar_confirmed }}</span>{% endif %}
+      </a>
+      <a href="{{ url_for('settings.index') }}"
+         class="{{ 'active' if request.blueprint == 'settings' }}">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Settings</span>
+      </a>
+    </nav>
+
+    {% if sidebar_findings %}
+    <div class="sidebar-section" id="sec-findings">
+      <div class="section-header" data-toggle="sec-findings">
+        <span class="section-icon">🕐</span>
+        <span class="section-label">Recent Findings</span>
+        <span class="section-arrow">▼</span>
+      </div>
+      <div class="section-items">
+        {% for f in sidebar_findings %}
+        <a href="{{ url_for('findings.detail', fid=f.id) }}" class="section-item" title="{{ f.title }}">
+          <span class="badge badge-{{ f.severity }}" style="font-size:9px;padding:1px 5px;flex-shrink:0;min-width:26px;text-align:center;font-weight:600">{{ f.severity[:3] }}</span>
+          <span class="item-text">{{ f.title }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if sidebar_programs %}
+    <div class="sidebar-section" id="sec-programs">
+      <div class="section-header" data-toggle="sec-programs">
+        <span class="section-icon">📋</span>
+        <span class="section-label">Active Programs</span>
+        <span class="section-arrow">▼</span>
+      </div>
+      <div class="section-items">
+        {% for p in sidebar_programs %}
+        {% set s = p.stats() %}
+        {% set sc = s.by_severity %}
+        <a href="{{ url_for('programs.detail', pid=p.id) }}" class="section-item" title="{{ p.name }} — {{ s.total }} findings">
+          <span class="item-text" style="padding-left:2px">{{ p.name }}</span>
+          {% if sc.critical > 0 %}
+          <span class="item-badge crit">{{ sc.critical }} crit</span>
+          {% elif sc.high > 0 %}
+          <span class="item-badge high">{{ sc.high }} high</span>
+          {% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sidebar-stats">
+      <div class="sidebar-stat" title="Total findings">
+        <span class="stat-icon">📦</span>
+        <span class="stat-num">{{ sidebar_total }}</span>
+      </div>
+      {% if sidebar_crit > 0 %}
+      <div class="sidebar-stat" title="Critical">
+        <span class="stat-icon" style="color:var(--critical)">🔴</span>
+        <span class="stat-num" style="color:var(--critical)">{{ sidebar_crit }}</span>
+      </div>
+      {% endif %}
+      {% if sidebar_confirmed > 0 %}
+      <div class="sidebar-stat" title="Confirmed">
+        <span class="stat-icon" style="color:#06d6a0">✅</span>
+        <span class="stat-num" style="color:#06d6a0">{{ sidebar_confirmed }}</span>
+      </div>
+      {% endif %}
+      {% if sidebar_rewarded > 0 %}
+      <div class="sidebar-stat" title="Rewarded">
+        <span class="stat-icon" style="color:#00ffb3">💰</span>
+        <span class="stat-num" style="color:#00ffb3">{{ sidebar_rewarded }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
 
   <div class="sidebar-footer">
     <a href="{{ url_for('findings.add_finding') }}" class="btn-add">
-      + Add Finding <span class="kbd-hint">N</span>
+      <span class="btn-icon">📝</span>
+      <span class="btn-text">+ Add Finding</span>
+      <span class="kbd-hint">N</span>
     </a>
-    <a href="{{ url_for('auth.logout') }}" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;">Logout</a>
+    <a href="{{ url_for('auth.logout') }}" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;">
+      <span class="btn-icon">🚪</span>
+      <span class="btn-text">Logout</span>
+    </a>
   </div>
 </aside>
 
@@ -683,6 +885,49 @@
       link.addEventListener('click', closeSidebar);
     });
   }
+
+  // ── Sidebar collapse toggle (desktop) ──
+  const collapseBtn = document.getElementById('sidebar-collapse');
+  const COLLAPSE_KEY = 'bbhuge_sidebar_collapsed';
+
+  function setCollapsed(val) {
+    sidebar.classList.toggle('collapsed', val);
+    collapseBtn.title = val ? 'Expand sidebar' : 'Collapse sidebar';
+    try { localStorage.setItem(COLLAPSE_KEY, val ? '1' : ''); } catch(e) {}
+  }
+
+  if (collapseBtn) {
+    // Load persisted state. Only apply on desktop (width > 900).
+    if (window.innerWidth > 900) {
+      try {
+        if (localStorage.getItem(COLLAPSE_KEY) === '1') setCollapsed(true);
+      } catch(e) {}
+    }
+    collapseBtn.addEventListener('click', () => {
+      setCollapsed(!sidebar.classList.contains('collapsed'));
+    });
+    // Re-check on resize (mobile/desktop switch)
+    window.addEventListener('resize', () => {
+      if (window.innerWidth <= 900 && sidebar.classList.contains('collapsed')) {
+        setCollapsed(false);
+      }
+    });
+  }
+
+  // ── Section accordion toggles ──
+  document.querySelectorAll('.section-header[data-toggle]').forEach(header => {
+    const section = document.getElementById(header.dataset.toggle);
+    if (!section) return;
+    const key = 'bbhuge_sec_' + header.dataset.toggle;
+    // Restore persisted state: default open
+    let isCollapsed = false;
+    try { isCollapsed = localStorage.getItem(key) === '1'; } catch(e) {}
+    if (isCollapsed) section.classList.add('collapsed');
+    header.addEventListener('click', () => {
+      const nowCollapsed = section.classList.toggle('collapsed');
+      try { localStorage.setItem(key, nowCollapsed ? '1' : ''); } catch(e) {}
+    });
+  });
 
   // ── Search ──
   const searchInput = document.getElementById('sidebar-search');
