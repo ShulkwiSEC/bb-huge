@@ -1,6 +1,6 @@
 # bb-huge 🤗
-
 > `/bb-huge` — one command. Senior Bug Hunter, loaded.
+<img width="1000" height="600" alt="bb-huge-banner" src="https://github.com/user-attachments/assets/da28ed23-946d-4ef9-821b-f1eb8e2583c6" />
 
 Not a portal. A **Context Engineering Architecture** that converts your AI agent into a disciplined bug bounty hunter with a single slash command. The web UI is the visible tip — the real power is what happens inside the agent's brain when the skill fires.
 
