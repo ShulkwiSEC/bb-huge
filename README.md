@@ -24,13 +24,14 @@ Not a portal. A **Context Engineering Architecture** that converts your AI agent
 │  SKILL.md                │    │  MCP stdio Server            │
 │  • Senior Bug Hunter     │    │  • 30+ tools (CRUD + more)   │
 │    persona injected      │    │  • stdio transport           │
-│  • 6 SOPs loaded         │◄──►│  • stateless, fast           │
+│  • 7 SOPs loaded         │◄──►│  • stateless, fast           │
 │  • Full tool reference   │    │  • any agent, same API       │
 └──────────┬───────────────┘    └──────────┬───────────────────┘
            │                               │
            ▼                               ▼
 ┌──────────────────────────┐    ┌──────────────────────────────┐
 │  references/ (6 files)   │    │  PORTAL (Flask + SQLite)     │
+│  • im-scheduled.md       │    │  • Dashboard, Charts         │
 │  • bb-orchestrator.md    │    │  • Dashboard, Charts         │
 │  • bb-operator.md        │    │  • Findings CRUD             │
 │  • bb-recon.md           │    │  • Programs tracking         │
@@ -92,14 +93,16 @@ When you type the command, the agent's brain gets injected with:
 ```mermaid
 graph TB
     C["/bb-huge command"] --> SKILL[SKILL.md]
-    SKILL --> SOP0["SOP-0: Session Init<br/>Load skill, get brief"]
+    SKILL --> SOP0["SOP-0: Scheduled Mission<br/>Read constraints & prompts"]
     SKILL --> SOP1["SOP-1: New Target<br/>Recon setup, skill roster"]
     SKILL --> SOP2["SOP-2: Vulnerability Found<br/>Capture-first + evidence pipeline"]
     SKILL --> SOP3["SOP-3: Resume Finding<br/>Full context restore"]
     SKILL --> SOP4["SOP-4: End Session<br/>Closeout checklist"]
     SKILL --> SOP5["SOP-5: Pre-Hunt Q&A<br/>Questioning layer"]
+    SKILL --> SOP6["SOP-6: Report Prep<br/>Generate report pack"]
     SKILL --> MCP["30+ MCP Tools<br/>Findings, Observations,<br/>Hypotheses, Evidence,<br/>Assets, Endpoints,<br/>Recon, Programs"]
     SKILL --> REFS["Reference Library"]
+    REFS --> SCHED[im-scheduled.md]
     REFS --> ORCH[bb-orchestrator.md]
     REFS --> OP[bb-operator.md]
     REFS --> RECON[bb-recon.md]
@@ -207,9 +210,9 @@ cp -r skills/bb-huge ~/.gemini/skills/
 
 Now every time you type `/bb-huge`, the agent loads:
 - Senior Bug Hunter persona with capture-first discipline
-- 6 Standard Operating Procedures (SOP-0 through SOP-5)
+- 7 Standard Operating Procedures (SOP-0 through SOP-6)
 - Full tool reference & severity/status guides
-- 6 reference files covering methodology, recon, scope, reports
+- 7 reference files covering methodology, recon, scope, reports, and scheduled missions
 - 30+ MCP tools wired to your portal
 
 **The agent doesn't just "know about" bug bounty. It becomes a bug bounty hunter.**
@@ -523,6 +526,7 @@ bb-huge/
 ├── skills/bb-huge/
 │   ├── SKILL.md                 # The brain — agent instruction
 │   ├── references/
+│   │   ├── im-scheduled.md           # Multi-skill routing & coordination
 │   │   ├── bb-orchestrator.md           # Multi-skill routing & coordination
 │   │   ├── bb-operator.md               # Full hunting methodology
 │   │   ├── bb-recon.md                  # Recon playbook + tool commands

@@ -230,6 +230,16 @@ When a vulnerability is discovered during any session:
 
 ## Standard Operating Procedures
 
+### SOP-0 · Scheduled Mission Initialization
+
+Run this FIRST if activated via an automated schedule, cron job, or queued mission dispatcher:
+
+1. **Load `references/im-scheduled.md`** immediately before taking any other action.
+2. Read and ingest the system prompt and mission constraints defined in that file.
+3. Proceed with the assigned mission following those specific instructions, applying SOP-1 through SOP-6 only as permitted by the scheduled mission parameters.
+
+---
+
 ### SOP-1 · New Target / Session Start
 
 Run this when assigned a new target or starting a fresh session:
@@ -523,6 +533,7 @@ for the current task — do not load all files at once.
 | `references/bb-operator.md` | "How should I approach this target?", session structure, high-frequency patterns |
 | `references/bb-recon.md` | Recon phase — subdomain enum, tech fingerprinting, JS analysis, attack surface mapping |
 | `references/bb-report-templates.md` | Writing a report — fill-in templates for XSS, IDOR, SSRF, SQLi, and more |
+| `references/im-scheduled.md` | Start of a scheduled or automated mission — dictates specific constraints and system prompts |
 
 Check `references/` for files added after this document — the library grows over time.
 
