@@ -477,6 +477,38 @@ the agent's output and question number.
 
 </details>
 
+
+<details>
+<summary><strong>🕒 Run bb-huge automatically on a schedule</strong></summary>
+
+Because of the `SOP-0` scheduled mission protocol, you can easily run your agent fully hands-free on an hourly or daily basis. The agent will read its constraints from `im-scheduled.md` and execute without human input.
+
+#### 🤖 Native Agent Apps (OpenCode, Codex, etc.)
+If your agent's UI already has a built-in task scheduler (like OpenCode), simply configure your time interval and paste this exact prompt into the task configuration:
+
+> /bb-huge This is a scheduled mission. Follow SOP-0 and execute.
+
+---
+
+#### ❗If not  (we can do it manuly)
+##### 🐧 Linux / WSL / macOS (Cron for CLI agents)
+If you are using CLI agents, open your crontab (`crontab -e`) and add this line to run it at the top of every hour. Adjust the paths to your specific CLI tool and log directory.
+
+#### Run hourly at minute 0
+0 * * * * echo "/bb-huge This is a scheduled mission. Follow SOP-0 and execute." | opencode >> ~/.opencode/logs/bb-huge-hourly.log 2>&1
+
+##### 🪟 Windows (PowerShell + Task Scheduler)
+1. Create a simple PowerShell script (e.g., `hourly-hunt.ps1`):
+
+" /bb-huge This is a scheduled mission. Follow SOP-0 and execute." | opencode | Out-File -FilePath "$HOME\bb-huge-hourly.log" -Append
+
+2. Open **Task Scheduler**, click **Create Task**.
+3. Set Trigger: **Daily**, and check **Repeat task every: 1 hour**.
+4. Set Action: **Start a program**, type `powershell.exe`, and add the argument `-ExecutionPolicy Bypass -File C:\path\to\hourly-hunt.ps1`.
+
+*(Note: Replace `opencode` with whichever CLI agent you are using).*
+</details>
+
 <details>
 <summary><strong>🧪 Test MCP manually</strong></summary>
 
