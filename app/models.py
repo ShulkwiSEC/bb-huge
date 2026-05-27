@@ -247,8 +247,13 @@ class TargetContext(db.Model):
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
+    # When a Program is deleted we want the associated TargetContext removed
+    # as well instead of SQLAlchemy attempting to null the foreign key which
+    # would violate the NOT NULL constraint. Add cascade so the TargetContext
+    # is deleted together with its Program.
     program = db.relationship(
-        "Program", backref=db.backref("target_context", uselist=False)
+        "Program",
+        backref=db.backref("target_context", uselist=False, cascade="all, delete-orphan"),
     )
 
     @property
