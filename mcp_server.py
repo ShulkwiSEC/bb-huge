@@ -845,6 +845,152 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "bb_update_program",
+        "description": "Update an existing program's fields (name, platform, scope, etc.).",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "name": {"type": "string"},
+                "platform": {"type": "string"},
+                "program_url": {"type": "string"},
+                "logo_url": {"type": "string"},
+                "scope_in": {"type": "string"},
+                "scope_out": {"type": "string"},
+                "notes": {"type": "string"},
+                "active": {"type": "boolean"},
+            },
+        },
+    },
+    {
+        "name": "bb_delete_program",
+        "description": "Delete a program and all its associated records (cascade).",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_update_observation",
+        "description": "Update an existing observation's fields.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "title": {"type": "string"},
+                "summary": {"type": "string"},
+                "category": {
+                    "type": "string",
+                    "enum": [
+                        "behavior",
+                        "auth",
+                        "access_control",
+                        "input_handling",
+                        "business_logic",
+                        "rate_limit",
+                        "recon",
+                        "other",
+                    ],
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["open", "testing", "closed", "promoted"],
+                },
+                "agent": {"type": "string"},
+                "source_tool": {"type": "string"},
+                "confidence": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_delete_observation",
+        "description": "Delete an observation.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_update_hypothesis",
+        "description": "Update an existing hypothesis's fields.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "title": {"type": "string"},
+                "weakness_hint": {"type": "string"},
+                "cwe": {"type": "string"},
+                "severity_hint": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "informational"],
+                },
+                "attack_path": {"type": "string"},
+                "impact_hypothesis": {"type": "string"},
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "open",
+                        "testing",
+                        "confirmed",
+                        "rejected",
+                        "duplicate",
+                        "promoted",
+                    ],
+                },
+                "agent": {"type": "string"},
+                "confidence": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_delete_hypothesis",
+        "description": "Delete a hypothesis.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_delete_recon",
+        "description": "Delete a recon entry.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_delete_note",
+        "description": "Delete a note from a finding.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+            },
+        },
+    },
 ]
 
 
@@ -1016,6 +1162,33 @@ def dispatch(name: str, args: dict) -> Any:
 
     elif name == "bb_delete_endpoint":
         return api_delete(f"/endpoints/{args['id']}")
+
+    elif name == "bb_update_program":
+        pid = args.pop("id")
+        return api_patch(f"/programs/{pid}", args)
+
+    elif name == "bb_delete_program":
+        return api_delete(f"/programs/{args['id']}")
+
+    elif name == "bb_update_observation":
+        oid = args.pop("id")
+        return api_patch(f"/observations/{oid}", args)
+
+    elif name == "bb_delete_observation":
+        return api_delete(f"/observations/{args['id']}")
+
+    elif name == "bb_update_hypothesis":
+        hid = args.pop("id")
+        return api_patch(f"/hypotheses/{hid}", args)
+
+    elif name == "bb_delete_hypothesis":
+        return api_delete(f"/hypotheses/{args['id']}")
+
+    elif name == "bb_delete_recon":
+        return api_delete(f"/recon/{args['id']}")
+
+    elif name == "bb_delete_note":
+        return api_delete(f"/notes/{args['id']}")
 
     else:
         return {"error": f"Unknown tool: {name}"}

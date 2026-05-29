@@ -18,3 +18,5 @@ app/static/uploads/*
 .DS_Store
 *.log
 .omo
+[0-9][0-9]-*
+.understand-anything/

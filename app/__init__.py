@@ -11,9 +11,13 @@ def create_app(config_object="config.Config"):
 
     # ── Validation: warn on missing env vars, never crash ─────────────────────
     import importlib
-    cfg_module, cfg_class = config_object.rsplit(".", 1)
-    cfg = getattr(importlib.import_module(cfg_module), cfg_class)
-    cfg.validate()
+    if isinstance(config_object, str):
+        cfg_module, cfg_class = config_object.rsplit(".", 1)
+        cfg = getattr(importlib.import_module(cfg_module), cfg_class)
+    else:
+        cfg = config_object
+    if hasattr(cfg, "validate"):
+        cfg.validate()
 
     # Ensure instance and uploads folders exist
     os.makedirs(app.instance_path, exist_ok=True)

@@ -106,8 +106,11 @@ All portal operations use the `bb-huge` MCP server. Auth is handled via the
 |------|-------------|
 | `bb_list_programs` | Look up programs to find their IDs |
 | `bb_create_program` | Create a new bug bounty program entry with scope |
+| `bb_update_program` | Update an existing program's fields (name, platform, scope, etc.) |
+| `bb_delete_program` | Delete a program and all its associated records |
 | `bb_get_program_brief` | **START HERE** — pull one compact program briefing before work starts |
 | `bb_add_recon` | Log recon data (subdomains, endpoints, tech) under a program |
+| `bb_delete_recon` | Delete a recon entry |
 | `bb_get_context` | Retrieve pre-hunt Q&A data for a program |
 | `bb_save_context` | Save pre-hunt Q&A answers for a program |
 
@@ -116,7 +119,11 @@ All portal operations use the `bb-huge` MCP server. Auth is handled via the
 | Tool | When to use |
 |------|-------------|
 | `bb_log_observation` | Record a weak signal, odd behavior, or incomplete recon observation |
+| `bb_update_observation` | Update an existing observation's fields |
+| `bb_delete_observation` | Delete an observation |
 | `bb_log_hypothesis` | Track a stronger candidate bug before promotion to a finding |
+| `bb_update_hypothesis` | Update an existing hypothesis's fields |
+| `bb_delete_hypothesis` | Delete a hypothesis |
 | `bb_attach_http_pair` | Store a structured HTTP request/response as evidence |
 | `bb_promote_observation` | Convert a matured observation into a linked hypothesis |
 | `bb_promote_hypothesis` | Convert a matured hypothesis into a linked finding |
@@ -143,6 +150,7 @@ All portal operations use the `bb-huge` MCP server. Auth is handled via the
 | `bb_get_stats` | Dashboard summary — totals by severity/status/agent |
 | `bb_notify` | Send an alert to Discord/Telegram webhooks |
 | `bb_add_note` | Log progress, dead ends, or partial findings without overwriting fields |
+| `bb_delete_note` | Delete a note from a finding |
 
 **Agent identity rule**: Always set `agent` to the identity of whoever is
 running (`gemini-cli`, `claude`, `claude-code`, `emmu`, `codex`). Never use
