@@ -99,6 +99,46 @@ def _validate_choice(value, allowed, field_name):
     return None
 
 
+def _validate_from_data(data, field, allowed, name=None):
+    value = data.get(field) if isinstance(data, dict) else data
+    if value is not None and value not in allowed:
+        return jsonify({"error": f"{name or field} must be one of {allowed}"}), 400
+    return None
+
+
+def _apply_fields(obj, data, fields):
+    for field in fields:
+        if field in data:
+            setattr(obj, field, data[field])
+
+
+def _require_fields(data, *fields):
+    for field in fields:
+        if not data.get(field):
+            return jsonify({"error": f"{field} is required"}), 400
+    return None
+
+
+def _check_ownership(item, program_id, label):
+    if item.program_id and item.program_id != program_id:
+        return jsonify({"error": f"{label} does not belong to this program"}), 400
+    return None
+
+
+def _touch(obj):
+    obj.updated_at = datetime.now(timezone.utc)
+
+
+def _save(obj=None):
+    if obj is not None:
+        db.session.add(obj)
+    db.session.commit()
+
+
+def _require_program(pid):
+    Program.query.get_or_404(pid)
+
+
 def _finding_summary(finding):
     return {
         "id": finding.id,
@@ -381,20 +421,24 @@ def get_report_pack(fid):
 def create_finding():
     data = request.get_json(force=True) or {}
 
-    if not data.get("title") or not data.get("target"):
-        return jsonify({"error": "title and target are required"}), 400
+    err = _require_fields(data, "title", "target")
+    if err:
+        return err
 
     severity = data.get("severity", "medium")
-    if severity not in SEVERITIES:
-        return jsonify({"error": f"severity must be one of {SEVERITIES}"}), 400
+    err = _validate_from_data(severity, "severity", SEVERITIES)
+    if err:
+        return err
 
     status = data.get("status", "discovered")
-    if status not in STATUSES:
-        return jsonify({"error": f"status must be one of {STATUSES}"}), 400
+    err = _validate_from_data(status, "status", STATUSES)
+    if err:
+        return err
 
     confidence = data.get("confidence", "high")
-    if confidence not in CONFIDENCE_LEVELS:
-        return jsonify({"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}), 400
+    err = _validate_from_data(confidence, "confidence", CONFIDENCE_LEVELS)
+    if err:
+        return err
 
     hypothesis_id = data.get("hypothesis_id")
     if hypothesis_id:
@@ -415,8 +459,7 @@ def create_finding():
         program_id=data.get("program_id") or None,
         hypothesis_id=hypothesis_id or None,
     )
-    db.session.add(finding)
-    db.session.commit()
+    _save(finding)
     return jsonify(finding.to_dict()), 201
 
 
@@ -426,18 +469,10 @@ def update_finding(fid):
     finding = Finding.query.get_or_404(fid)
     data = request.get_json(force=True) or {}
 
-    for field in [
-        "title",
-        "target",
-        "platform",
-        "agent",
-        "cwe",
-        "description",
-        "poc",
-        "program_id",
-    ]:
-        if field in data:
-            setattr(finding, field, data[field])
+    _apply_fields(finding, data, [
+        "title", "target", "platform", "agent", "cwe",
+        "description", "poc", "program_id",
+    ])
 
     if "hypothesis_id" in data:
         hypothesis_id = data["hypothesis_id"]
@@ -445,31 +480,22 @@ def update_finding(fid):
             Hypothesis.query.get_or_404(hypothesis_id)
         finding.hypothesis_id = hypothesis_id or None
 
-    if "severity" in data:
-        if data["severity"] not in SEVERITIES:
-            return jsonify({"error": f"severity must be one of {SEVERITIES}"}), 400
-        finding.severity = data["severity"]
-
-    if "status" in data:
-        if data["status"] not in STATUSES:
-            return jsonify({"error": f"status must be one of {STATUSES}"}), 400
-        finding.status = data["status"]
-
-    if "confidence" in data:
-        if data["confidence"] not in CONFIDENCE_LEVELS:
-            return (
-                jsonify(
-                    {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
-                ),
-                400,
-            )
-        finding.confidence = data["confidence"]
+    for field, allowed in [
+        ("severity", SEVERITIES),
+        ("status", STATUSES),
+        ("confidence", CONFIDENCE_LEVELS),
+    ]:
+        if field in data:
+            err = _validate_from_data(data, field, allowed)
+            if err:
+                return err
+            setattr(finding, field, data[field])
 
     if "cvss" in data:
         finding.cvss = _parse_float(data["cvss"])
 
-    finding.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
+    _touch(finding)
+    _save()
     return jsonify(finding.to_dict())
 
 
@@ -479,11 +505,12 @@ def update_status(fid):
     finding = Finding.query.get_or_404(fid)
     data = request.get_json(force=True) or {}
     new_status = data.get("status")
-    if new_status not in STATUSES:
-        return jsonify({"error": f"status must be one of {STATUSES}"}), 400
+    err = _validate_from_data(new_status, "status", STATUSES)
+    if err:
+        return err
     finding.status = new_status
-    finding.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
+    _touch(finding)
+    _save()
     return jsonify({"id": finding.id, "status": finding.status})
 
 
@@ -492,7 +519,7 @@ def update_status(fid):
 def delete_finding(fid):
     finding = Finding.query.get_or_404(fid)
     db.session.delete(finding)
-    db.session.commit()
+    _save()
     return jsonify({"deleted": fid})
 
 
@@ -534,8 +561,7 @@ def upload_attachment(fid):
         original_name=original,
         path=dest,
     )
-    db.session.add(attachment)
-    db.session.commit()
+    _save(attachment)
     return jsonify(attachment.to_dict()), 201
 
 
@@ -579,8 +605,9 @@ def get_program(pid):
 @api_key_required
 def create_program():
     data = request.get_json(force=True) or {}
-    if not data.get("name"):
-        return jsonify({"error": "name is required"}), 400
+    err = _require_fields(data, "name")
+    if err:
+        return err
     program = Program(
         name=data["name"].strip(),
         platform=data.get("platform", "private"),
@@ -591,8 +618,7 @@ def create_program():
         notes=data.get("notes", ""),
         active=data.get("active", True),
     )
-    db.session.add(program)
-    db.session.commit()
+    _save(program)
     return jsonify(program.to_dict()), 201
 
 
@@ -601,16 +627,25 @@ def create_program():
 def update_program(pid):
     program = Program.query.get_or_404(pid)
     data = request.get_json(force=True) or {}
-    for field in ["name", "platform", "program_url", "scope_in", "scope_out", "notes"]:
-        if field in data:
-            setattr(program, field, data[field])
+    _apply_fields(program, data, [
+        "name", "platform", "program_url", "scope_in", "scope_out", "notes",
+    ])
     if "logo_url" in data:
         program.logo_url = data.get("logo_url")
     if "active" in data:
         program.active = bool(data["active"])
-    program.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
+    _touch(program)
+    _save()
     return jsonify(program.to_dict())
+
+
+@api_bp.delete("/programs/<int:pid>")
+@api_key_required
+def delete_program(pid):
+    program = Program.query.get_or_404(pid)
+    db.session.delete(program)
+    _save()
+    return jsonify({"deleted": pid})
 
 
 @api_bp.get("/programs/<int:pid>/context")
@@ -625,7 +660,7 @@ def get_target_context(pid):
 @api_bp.put("/programs/<int:pid>/context")
 @api_key_required
 def save_target_context(pid):
-    Program.query.get_or_404(pid)
+    _require_program(pid)
     data = request.get_json(force=True) or {}
     payload = data.get("data", data)
 
@@ -635,7 +670,7 @@ def save_target_context(pid):
     else:
         ctx = TargetContext(program_id=pid, _data=json.dumps(payload))
         db.session.add(ctx)
-    db.session.commit()
+    _save()
     return jsonify(ctx.to_dict()), 201
 
 
@@ -719,10 +754,11 @@ def list_recon(pid):
 @api_bp.post("/programs/<int:pid>/recon")
 @api_key_required
 def add_recon(pid):
-    Program.query.get_or_404(pid)
+    _require_program(pid)
     data = request.get_json(force=True) or {}
-    if not data.get("value"):
-        return jsonify({"error": "value is required"}), 400
+    err = _require_fields(data, "value")
+    if err:
+        return err
     recon_entry = ReconEntry(
         program_id=pid,
         category=data.get("category", "subdomain"),
@@ -730,8 +766,7 @@ def add_recon(pid):
         notes=data.get("notes", ""),
         source=data.get("source", ""),
     )
-    db.session.add(recon_entry)
-    db.session.commit()
+    _save(recon_entry)
     return jsonify(recon_entry.to_dict()), 201
 
 
@@ -740,14 +775,14 @@ def add_recon(pid):
 def delete_recon(rid):
     recon_entry = ReconEntry.query.get_or_404(rid)
     db.session.delete(recon_entry)
-    db.session.commit()
+    _save()
     return jsonify({"deleted": rid})
 
 
 @api_bp.get("/programs/<int:pid>/observations")
 @api_key_required
 def list_observations(pid):
-    Program.query.get_or_404(pid)
+    _require_program(pid)
     status = request.args.get("status", "").strip()
     category = request.args.get("category", "").strip()
     query = Observation.query.filter_by(program_id=pid)
@@ -762,38 +797,26 @@ def list_observations(pid):
 @api_bp.post("/programs/<int:pid>/observations")
 @api_key_required
 def create_observation(pid):
-    Program.query.get_or_404(pid)
+    _require_program(pid)
     data = request.get_json(force=True) or {}
     title = (data.get("title") or "").strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
 
     category = data.get("category", "other")
-    if category not in OBSERVATION_CATEGORIES:
-        return (
-            jsonify(
-                {
-                    "error": f"category must be one of {OBSERVATION_CATEGORIES}"
-                }
-            ),
-            400,
-        )
+    err = _validate_from_data(category, "category", OBSERVATION_CATEGORIES)
+    if err:
+        return err
 
     status = data.get("status", "open")
-    if status not in OBSERVATION_STATUSES:
-        return (
-            jsonify({"error": f"status must be one of {OBSERVATION_STATUSES}"}),
-            400,
-        )
+    err = _validate_from_data(status, "status", OBSERVATION_STATUSES)
+    if err:
+        return err
 
     confidence = data.get("confidence", "medium")
-    if confidence not in CONFIDENCE_LEVELS:
-        return (
-            jsonify(
-                {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
-            ),
-            400,
-        )
+    err = _validate_from_data(confidence, "confidence", CONFIDENCE_LEVELS)
+    if err:
+        return err
 
     observation = Observation(
         program_id=pid,
@@ -805,8 +828,7 @@ def create_observation(pid):
         source_tool=data.get("source_tool"),
         confidence=confidence,
     )
-    db.session.add(observation)
-    db.session.commit()
+    _save(observation)
     return jsonify(observation.to_dict()), 201
 
 
@@ -822,43 +844,31 @@ def update_observation(oid):
     observation = Observation.query.get_or_404(oid)
     data = request.get_json(force=True) or {}
 
-    for field in ["title", "summary", "agent", "source_tool"]:
+    _apply_fields(observation, data, ["title", "summary", "agent", "source_tool"])
+
+    for field, allowed in [
+        ("category", OBSERVATION_CATEGORIES),
+        ("status", OBSERVATION_STATUSES),
+        ("confidence", CONFIDENCE_LEVELS),
+    ]:
         if field in data:
+            err = _validate_from_data(data, field, allowed)
+            if err:
+                return err
             setattr(observation, field, data[field])
 
-    if "category" in data:
-        if data["category"] not in OBSERVATION_CATEGORIES:
-            return (
-                jsonify(
-                    {
-                        "error": f"category must be one of {OBSERVATION_CATEGORIES}"
-                    }
-                ),
-                400,
-            )
-        observation.category = data["category"]
-
-    if "status" in data:
-        if data["status"] not in OBSERVATION_STATUSES:
-            return (
-                jsonify({"error": f"status must be one of {OBSERVATION_STATUSES}"}),
-                400,
-            )
-        observation.status = data["status"]
-
-    if "confidence" in data:
-        if data["confidence"] not in CONFIDENCE_LEVELS:
-            return (
-                jsonify(
-                    {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
-                ),
-                400,
-            )
-        observation.confidence = data["confidence"]
-
-    observation.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
+    _touch(observation)
+    _save()
     return jsonify(observation.to_dict())
+
+
+@api_bp.delete("/observations/<int:oid>")
+@api_key_required
+def delete_observation(oid):
+    observation = Observation.query.get_or_404(oid)
+    db.session.delete(observation)
+    _save()
+    return jsonify({"deleted": oid})
 
 
 @api_bp.post("/observations/<int:oid>/promote")
@@ -872,16 +882,20 @@ def promote_observation(oid):
         return jsonify({"error": "title is required"}), 400
 
     severity_hint = data.get("severity_hint")
-    if severity_hint and severity_hint not in SEVERITIES:
-        return jsonify({"error": f"severity_hint must be one of {SEVERITIES}"}), 400
+    if severity_hint:
+        err = _validate_from_data(severity_hint, "severity_hint", SEVERITIES)
+        if err:
+            return err
 
     status = data.get("status", "open")
-    if status not in HYPOTHESIS_STATUSES:
-        return jsonify({"error": f"status must be one of {HYPOTHESIS_STATUSES}"}), 400
+    err = _validate_from_data(status, "status", HYPOTHESIS_STATUSES)
+    if err:
+        return err
 
     confidence = data.get("confidence", observation.confidence)
-    if confidence not in CONFIDENCE_LEVELS:
-        return jsonify({"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}), 400
+    err = _validate_from_data(confidence, "confidence", CONFIDENCE_LEVELS)
+    if err:
+        return err
 
     hypothesis = Hypothesis(
         program_id=observation.program_id,
@@ -897,17 +911,16 @@ def promote_observation(oid):
         confidence=confidence,
     )
     observation.status = "promoted"
-    observation.updated_at = datetime.now(timezone.utc)
+    _touch(observation)
 
-    db.session.add(hypothesis)
-    db.session.commit()
+    _save(hypothesis)
     return jsonify({"observation": observation.to_dict(), "hypothesis": hypothesis.to_dict()}), 201
 
 
 @api_bp.get("/programs/<int:pid>/hypotheses")
 @api_key_required
 def list_hypotheses(pid):
-    Program.query.get_or_404(pid)
+    _require_program(pid)
     status = request.args.get("status", "").strip()
     query = Hypothesis.query.filter_by(program_id=pid)
     if status:
@@ -919,37 +932,34 @@ def list_hypotheses(pid):
 @api_bp.post("/programs/<int:pid>/hypotheses")
 @api_key_required
 def create_hypothesis(pid):
-    Program.query.get_or_404(pid)
+    _require_program(pid)
     data = request.get_json(force=True) or {}
     title = (data.get("title") or "").strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
 
     status = data.get("status", "open")
-    if status not in HYPOTHESIS_STATUSES:
-        return (
-            jsonify({"error": f"status must be one of {HYPOTHESIS_STATUSES}"}),
-            400,
-        )
+    err = _validate_from_data(status, "status", HYPOTHESIS_STATUSES)
+    if err:
+        return err
 
     confidence = data.get("confidence", "medium")
-    if confidence not in CONFIDENCE_LEVELS:
-        return (
-            jsonify(
-                {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
-            ),
-            400,
-        )
+    err = _validate_from_data(confidence, "confidence", CONFIDENCE_LEVELS)
+    if err:
+        return err
 
     severity_hint = data.get("severity_hint")
-    if severity_hint and severity_hint not in SEVERITIES:
-        return jsonify({"error": f"severity_hint must be one of {SEVERITIES}"}), 400
+    if severity_hint:
+        err = _validate_from_data(severity_hint, "severity_hint", SEVERITIES)
+        if err:
+            return err
 
     observation_id = data.get("observation_id")
     if observation_id:
         observation = Observation.query.get_or_404(observation_id)
-        if observation.program_id != pid:
-            return jsonify({"error": "observation_id does not belong to this program"}), 400
+        err = _check_ownership(observation, pid, "observation_id")
+        if err:
+            return err
 
     hypothesis = Hypothesis(
         program_id=pid,
@@ -964,8 +974,7 @@ def create_hypothesis(pid):
         agent=data.get("agent", "manual"),
         confidence=confidence,
     )
-    db.session.add(hypothesis)
-    db.session.commit()
+    _save(hypothesis)
     return jsonify(hypothesis.to_dict()), 201
 
 
@@ -981,52 +990,49 @@ def update_hypothesis(hid):
     hypothesis = Hypothesis.query.get_or_404(hid)
     data = request.get_json(force=True) or {}
 
-    for field in [
-        "title",
-        "weakness_hint",
-        "cwe",
-        "attack_path",
-        "impact_hypothesis",
-        "agent",
-    ]:
-        if field in data:
-            setattr(hypothesis, field, data[field])
+    _apply_fields(hypothesis, data, [
+        "title", "weakness_hint", "cwe", "attack_path", "impact_hypothesis", "agent",
+    ])
 
     if "severity_hint" in data:
         severity_hint = data["severity_hint"]
-        if severity_hint and severity_hint not in SEVERITIES:
-            return jsonify({"error": f"severity_hint must be one of {SEVERITIES}"}), 400
+        if severity_hint:
+            err = _validate_from_data(severity_hint, "severity_hint", SEVERITIES)
+            if err:
+                return err
         hypothesis.severity_hint = severity_hint
 
-    if "status" in data:
-        if data["status"] not in HYPOTHESIS_STATUSES:
-            return (
-                jsonify({"error": f"status must be one of {HYPOTHESIS_STATUSES}"}),
-                400,
-            )
-        hypothesis.status = data["status"]
-
-    if "confidence" in data:
-        if data["confidence"] not in CONFIDENCE_LEVELS:
-            return (
-                jsonify(
-                    {"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}
-                ),
-                400,
-            )
-        hypothesis.confidence = data["confidence"]
+    for field, allowed in [
+        ("status", HYPOTHESIS_STATUSES),
+        ("confidence", CONFIDENCE_LEVELS),
+    ]:
+        if field in data:
+            err = _validate_from_data(data, field, allowed)
+            if err:
+                return err
+            setattr(hypothesis, field, data[field])
 
     if "observation_id" in data:
         observation_id = data["observation_id"]
         if observation_id:
             observation = Observation.query.get_or_404(observation_id)
-            if observation.program_id != hypothesis.program_id:
-                return jsonify({"error": "observation_id does not belong to this program"}), 400
+            err = _check_ownership(observation, hypothesis.program_id, "observation_id")
+            if err:
+                return err
         hypothesis.observation_id = observation_id or None
 
-    hypothesis.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
+    _touch(hypothesis)
+    _save()
     return jsonify(hypothesis.to_dict())
+
+
+@api_bp.delete("/hypotheses/<int:hid>")
+@api_key_required
+def delete_hypothesis(hid):
+    hypothesis = Hypothesis.query.get_or_404(hid)
+    db.session.delete(hypothesis)
+    _save()
+    return jsonify({"deleted": hid})
 
 
 @api_bp.post("/hypotheses/<int:hid>/promote")
@@ -1040,16 +1046,19 @@ def promote_hypothesis(hid):
         return jsonify({"error": "title is required"}), 400
 
     severity = data.get("severity") or hypothesis.severity_hint or "medium"
-    if severity not in SEVERITIES:
-        return jsonify({"error": f"severity must be one of {SEVERITIES}"}), 400
+    err = _validate_from_data(severity, "severity", SEVERITIES)
+    if err:
+        return err
 
     status = data.get("status", "discovered")
-    if status not in STATUSES:
-        return jsonify({"error": f"status must be one of {STATUSES}"}), 400
+    err = _validate_from_data(status, "status", STATUSES)
+    if err:
+        return err
 
     confidence = data.get("confidence", "high")
-    if confidence not in CONFIDENCE_LEVELS:
-        return jsonify({"error": f"confidence must be one of {CONFIDENCE_LEVELS}"}), 400
+    err = _validate_from_data(confidence, "confidence", CONFIDENCE_LEVELS)
+    if err:
+        return err
 
     finding = Finding(
         program_id=hypothesis.program_id,
@@ -1067,10 +1076,9 @@ def promote_hypothesis(hid):
         poc=data.get("poc", ""),
     )
     hypothesis.status = "promoted"
-    hypothesis.updated_at = datetime.now(timezone.utc)
+    _touch(hypothesis)
 
-    db.session.add(finding)
-    db.session.commit()
+    _save(finding)
     return jsonify({"hypothesis": hypothesis.to_dict(), "finding": finding.to_dict()}), 201
 
 
@@ -1106,7 +1114,7 @@ def create_evidence():
     program_id = data.get("program_id")
     if not program_id:
         return jsonify({"error": "program_id is required"}), 400
-    Program.query.get_or_404(program_id)
+    _require_program(program_id)
 
     title = (data.get("title") or "").strip()
     if not title:
@@ -1118,8 +1126,9 @@ def create_evidence():
             return jsonify({"error": "title is required"}), 400
 
     evidence_type = data.get("evidence_type", "other")
-    if evidence_type not in EVIDENCE_TYPES:
-        return jsonify({"error": f"evidence_type must be one of {EVIDENCE_TYPES}"}), 400
+    err = _validate_from_data(evidence_type, "evidence_type", EVIDENCE_TYPES)
+    if err:
+        return err
 
     finding_id = data.get("finding_id") or None
     hypothesis_id = data.get("hypothesis_id") or None
@@ -1127,16 +1136,19 @@ def create_evidence():
 
     if finding_id:
         finding = Finding.query.get_or_404(finding_id)
-        if finding.program_id and finding.program_id != program_id:
-            return jsonify({"error": "finding_id does not belong to this program"}), 400
+        err = _check_ownership(finding, program_id, "finding_id")
+        if err:
+            return err
     if hypothesis_id:
         hypothesis = Hypothesis.query.get_or_404(hypothesis_id)
-        if hypothesis.program_id != program_id:
-            return jsonify({"error": "hypothesis_id does not belong to this program"}), 400
+        err = _check_ownership(hypothesis, program_id, "hypothesis_id")
+        if err:
+            return err
     if observation_id:
         observation = Observation.query.get_or_404(observation_id)
-        if observation.program_id != program_id:
-            return jsonify({"error": "observation_id does not belong to this program"}), 400
+        err = _check_ownership(observation, program_id, "observation_id")
+        if err:
+            return err
 
     evidence = EvidenceRecord(
         program_id=program_id,
@@ -1158,8 +1170,7 @@ def create_evidence():
         source_tool=data.get("source_tool"),
         occurred_at=_parse_datetime(data.get("occurred_at")),
     )
-    db.session.add(evidence)
-    db.session.commit()
+    _save(evidence)
     return jsonify(evidence.to_dict()), 201
 
 
@@ -1175,23 +1186,16 @@ def update_evidence(eid):
     evidence = EvidenceRecord.query.get_or_404(eid)
     data = request.get_json(force=True) or {}
 
-    for field in [
-        "title",
-        "summary",
-        "request_method",
-        "request_url",
-        "request_body_text",
-        "response_body_text",
-        "account_label",
-        "auth_type",
-        "source_tool",
-    ]:
-        if field in data:
-            setattr(evidence, field, data[field])
+    _apply_fields(evidence, data, [
+        "title", "summary", "request_method", "request_url",
+        "request_body_text", "response_body_text", "account_label",
+        "auth_type", "source_tool",
+    ])
 
     if "evidence_type" in data:
-        if data["evidence_type"] not in EVIDENCE_TYPES:
-            return jsonify({"error": f"evidence_type must be one of {EVIDENCE_TYPES}"}), 400
+        err = _validate_from_data(data, "evidence_type", EVIDENCE_TYPES)
+        if err:
+            return err
         evidence.evidence_type = data["evidence_type"]
 
     if "response_status" in data:
@@ -1204,7 +1208,7 @@ def update_evidence(eid):
     if "occurred_at" in data:
         evidence.occurred_at = _parse_datetime(data["occurred_at"])
 
-    db.session.commit()
+    _save()
     return jsonify(evidence.to_dict())
 
 
@@ -1214,7 +1218,7 @@ def update_evidence(eid):
 @api_bp.get("/programs/<int:pid>/assets")
 @api_key_required
 def list_assets(pid):
-    Program.query.get_or_404(pid)
+    _require_program(pid)
     kind = request.args.get("kind", "").strip()
     query = Asset.query.filter_by(program_id=pid)
     if kind:
@@ -1226,17 +1230,22 @@ def list_assets(pid):
 @api_bp.post("/programs/<int:pid>/assets")
 @api_key_required
 def create_asset(pid):
-    Program.query.get_or_404(pid)
+    _require_program(pid)
     data = request.get_json(force=True) or {}
     identifier = (data.get("identifier") or "").strip()
     if not identifier:
         return jsonify({"error": "identifier is required"}), 400
+
     kind = data.get("kind", "other")
-    if kind not in ASSET_KINDS:
-        return jsonify({"error": f"kind must be one of {ASSET_KINDS}"}), 400
+    err = _validate_from_data(kind, "kind", ASSET_KINDS)
+    if err:
+        return err
+
     environment = data.get("environment", "unknown")
-    if environment not in ASSET_ENVIRONMENTS:
-        return jsonify({"error": f"environment must be one of {ASSET_ENVIRONMENTS}"}), 400
+    err = _validate_from_data(environment, "environment", ASSET_ENVIRONMENTS)
+    if err:
+        return err
+
     asset = Asset(
         program_id=pid,
         kind=kind,
@@ -1245,8 +1254,7 @@ def create_asset(pid):
         notes=data.get("notes", ""),
         active=data.get("active", True),
     )
-    db.session.add(asset)
-    db.session.commit()
+    _save(asset)
     return jsonify(asset.to_dict()), 201
 
 
@@ -1255,21 +1263,22 @@ def create_asset(pid):
 def update_asset(aid):
     asset = Asset.query.get_or_404(aid)
     data = request.get_json(force=True) or {}
-    for field in ["identifier", "notes"]:
+    _apply_fields(asset, data, ["identifier", "notes"])
+
+    for field, allowed in [
+        ("kind", ASSET_KINDS),
+        ("environment", ASSET_ENVIRONMENTS),
+    ]:
         if field in data:
+            err = _validate_from_data(data, field, allowed)
+            if err:
+                return err
             setattr(asset, field, data[field])
-    if "kind" in data:
-        if data["kind"] not in ASSET_KINDS:
-            return jsonify({"error": f"kind must be one of {ASSET_KINDS}"}), 400
-        asset.kind = data["kind"]
-    if "environment" in data:
-        if data["environment"] not in ASSET_ENVIRONMENTS:
-            return jsonify({"error": f"environment must be one of {ASSET_ENVIRONMENTS}"}), 400
-        asset.environment = data["environment"]
+
     if "active" in data:
         asset.active = bool(data["active"])
-    asset.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
+    _touch(asset)
+    _save()
     return jsonify(asset.to_dict())
 
 
@@ -1278,7 +1287,7 @@ def update_asset(aid):
 def delete_asset(aid):
     asset = Asset.query.get_or_404(aid)
     db.session.delete(asset)
-    db.session.commit()
+    _save()
     return jsonify({"deleted": aid})
 
 
@@ -1307,8 +1316,9 @@ def create_endpoint(aid):
         return jsonify({"error": "path is required"}), 400
     method = data.get("method", "GET")
     protocol = data.get("protocol", "https")
-    if protocol not in ENDPOINT_PROTOCOLS:
-        return jsonify({"error": f"protocol must be one of {ENDPOINT_PROTOCOLS}"}), 400
+    err = _validate_from_data(protocol, "protocol", ENDPOINT_PROTOCOLS)
+    if err:
+        return err
     endpoint = Endpoint(
         asset_id=aid,
         method=method,
@@ -1319,8 +1329,7 @@ def create_endpoint(aid):
         discovered_by=data.get("discovered_by"),
         notes=data.get("notes", ""),
     )
-    db.session.add(endpoint)
-    db.session.commit()
+    _save(endpoint)
     return jsonify(endpoint.to_dict()), 201
 
 
@@ -1329,19 +1338,18 @@ def create_endpoint(aid):
 def update_endpoint(eid):
     endpoint = Endpoint.query.get_or_404(eid)
     data = request.get_json(force=True) or {}
-    for field in ["path", "content_type", "discovered_by", "notes"]:
-        if field in data:
-            setattr(endpoint, field, data[field])
+    _apply_fields(endpoint, data, ["path", "content_type", "discovered_by", "notes"])
     if "method" in data:
         endpoint.method = data["method"]
     if "protocol" in data:
-        if data["protocol"] not in ENDPOINT_PROTOCOLS:
-            return jsonify({"error": f"protocol must be one of {ENDPOINT_PROTOCOLS}"}), 400
+        err = _validate_from_data(data, "protocol", ENDPOINT_PROTOCOLS)
+        if err:
+            return err
         endpoint.protocol = data["protocol"]
     if "auth_required" in data:
         endpoint.auth_required = bool(data["auth_required"]) if data["auth_required"] is not None else None
-    endpoint.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
+    _touch(endpoint)
+    _save()
     return jsonify(endpoint.to_dict())
 
 
@@ -1350,7 +1358,7 @@ def update_endpoint(eid):
 def delete_endpoint(eid):
     endpoint = Endpoint.query.get_or_404(eid)
     db.session.delete(endpoint)
-    db.session.commit()
+    _save()
     return jsonify({"deleted": eid})
 
 
@@ -1380,75 +1388,49 @@ def similarity_check():
         observation_query = observation_query.filter_by(program_id=program_id)
         hypothesis_query = hypothesis_query.filter_by(program_id=program_id)
 
+    def _score(item_dict, summary, kind="finding"):
+        score, reasons = _similarity_score(item_dict, query)
+        if score < 20:
+            return None
+        if kind == "observation":
+            relation = "likely_duplicate" if score >= 45 else "related_work"
+        else:
+            relation = "exact_match" if score >= 65 else "likely_duplicate" if score >= 40 else "related_work"
+        return {"relation": relation, "score": score, "reasons": reasons, "item": summary}
+
     scored = []
 
     for finding in finding_query.order_by(Finding.updated_at.desc()).limit(150).all():
-        score, reasons = _similarity_score(
-            {
-                "id": finding.id,
-                "title": finding.title,
-                "target": finding.target,
-                "cwe": finding.cwe,
-                "description": finding.description,
-            },
-            query,
+        result = _score(
+            {"id": finding.id, "title": finding.title, "target": finding.target,
+             "cwe": finding.cwe, "description": finding.description},
+            _finding_summary(finding),
+            kind="finding",
         )
-        if score >= 20:
-            relation = "exact_match" if score >= 65 else "likely_duplicate" if score >= 40 else "related_work"
-            scored.append(
-                {
-                    "kind": "finding",
-                    "relation": relation,
-                    "score": score,
-                    "reasons": reasons,
-                    "item": _finding_summary(finding),
-                }
-            )
+        if result:
+            scored.append({"kind": "finding", **result})
 
     for observation in observation_query.order_by(Observation.updated_at.desc()).limit(150).all():
-        score, reasons = _similarity_score(
-            {
-                "id": observation.id,
-                "title": observation.title,
-                "program_name": observation.program.name if observation.program else "",
-                "summary": observation.summary,
-            },
-            query,
+        result = _score(
+            {"id": observation.id, "title": observation.title,
+             "program_name": observation.program.name if observation.program else "",
+             "summary": observation.summary},
+            _observation_summary(observation),
+            kind="observation",
         )
-        if score >= 20:
-            relation = "likely_duplicate" if score >= 45 else "related_work"
-            scored.append(
-                {
-                    "kind": "observation",
-                    "relation": relation,
-                    "score": score,
-                    "reasons": reasons,
-                    "item": _observation_summary(observation),
-                }
-            )
+        if result:
+            scored.append({"kind": "observation", **result})
 
     for hypothesis in hypothesis_query.order_by(Hypothesis.updated_at.desc()).limit(150).all():
-        score, reasons = _similarity_score(
-            {
-                "id": hypothesis.id,
-                "title": hypothesis.title,
-                "program_name": hypothesis.program.name if hypothesis.program else "",
-                "cwe": hypothesis.cwe,
-                "summary": hypothesis.attack_path or hypothesis.impact_hypothesis,
-            },
-            query,
+        result = _score(
+            {"id": hypothesis.id, "title": hypothesis.title,
+             "program_name": hypothesis.program.name if hypothesis.program else "",
+             "cwe": hypothesis.cwe, "summary": hypothesis.attack_path or hypothesis.impact_hypothesis},
+            _hypothesis_summary(hypothesis),
+            kind="hypothesis",
         )
-        if score >= 20:
-            relation = "exact_match" if score >= 65 else "likely_duplicate" if score >= 40 else "related_work"
-            scored.append(
-                {
-                    "kind": "hypothesis",
-                    "relation": relation,
-                    "score": score,
-                    "reasons": reasons,
-                    "item": _hypothesis_summary(hypothesis),
-                }
-            )
+        if result:
+            scored.append({"kind": "hypothesis", **result})
 
     scored.sort(key=lambda item: item["score"], reverse=True)
     exact_matches = [item for item in scored if item["relation"] == "exact_match"][:10]
@@ -1469,15 +1451,15 @@ def similarity_check():
 @api_key_required
 def add_note(fid):
     data = request.get_json(force=True) or {}
-    if not data.get("content"):
-        return jsonify({"error": "content is required"}), 400
+    err = _require_fields(data, "content")
+    if err:
+        return err
     note = Note(
         finding_id=fid,
         content=data["content"],
         agent=data.get("agent", "manual"),
     )
-    db.session.add(note)
-    db.session.commit()
+    _save(note)
     return jsonify(note.to_dict()), 201
 
 
@@ -1486,7 +1468,7 @@ def add_note(fid):
 def delete_note(nid):
     note = Note.query.get_or_404(nid)
     db.session.delete(note)
-    db.session.commit()
+    _save()
     return jsonify({"deleted": nid})
 
 
@@ -1527,17 +1509,18 @@ def bulk_update_status():
     status = data.get("status")
     if not ids or not status:
         return jsonify({"error": "ids (list) and status are required"}), 400
-    if status not in STATUSES:
-        return jsonify({"error": f"status must be one of {STATUSES}"}), 400
+    err = _validate_from_data(status, "status", STATUSES)
+    if err:
+        return err
 
     updated = []
     for fid in ids:
         finding = db.session.get(Finding, fid)
         if finding:
             finding.status = status
-            finding.updated_at = datetime.now(timezone.utc)
+            _touch(finding)
             updated.append(fid)
-    db.session.commit()
+    _save()
     return jsonify({"updated": updated, "status": status})
 
 
