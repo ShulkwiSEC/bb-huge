@@ -15,6 +15,7 @@
 ### Notes & Collaboration
 
 * `bb_add_note` — Add notes/comments to findings
+* `bb_delete_note` — Delete a note from a finding
 * `bb_bulk_update_status` — Bulk update finding statuses
 * `bb_notify` — Send webhook notifications (Discord/Telegram/etc.)
 
@@ -26,12 +27,15 @@
 ### Program Management
 
 * `bb_create_program` — Create a bug bounty program
+* `bb_update_program` — Update an existing program's fields
+* `bb_delete_program` — Delete a program and all associated records
 * `bb_list_programs` — List programs and metadata
 * `bb_get_program_brief` — Retrieve compact hunt briefing/context
 
 ### Recon & Intelligence
 
 * `bb_add_recon` — Store recon artifacts (subdomains/endpoints/etc.)
+* `bb_delete_recon` — Delete a recon entry
 * `bb_list_assets` — List program assets
 * `bb_add_asset` — Add an asset to a program
 * `bb_update_asset` — Update asset metadata
@@ -52,7 +56,11 @@
 ### Observations & Hypotheses Workflow
 
 * `bb_log_observation` — Log weak signals or suspicious behavior
+* `bb_update_observation` — Update an existing observation's fields
+* `bb_delete_observation` — Delete an observation
 * `bb_log_hypothesis` — Log candidate vulnerabilities
+* `bb_update_hypothesis` — Update an existing hypothesis's fields
+* `bb_delete_hypothesis` — Delete a hypothesis
 * `bb_promote_observation` — Convert observation → hypothesis
 * `bb_promote_hypothesis` — Convert hypothesis → finding
 * `bb_check_existing_work` — Check for duplicate/redundant work
