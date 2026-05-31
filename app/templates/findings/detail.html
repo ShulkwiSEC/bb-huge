@@ -24,7 +24,7 @@
   .meta-pill.mono strong { font-family: var(--mono); }
   .meta-pill.program-pill { border-color: rgba(138,122,255,0.25); background: rgba(138,122,255,0.08); }
 
-  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow:auto; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 25px; overflow:auto; overflow-y: hidden; }
   .tab-btn {
     padding: 10px 18px; font-size: 13px; font-weight: 500;
     background: none; border: none; color: var(--muted);
@@ -37,17 +37,41 @@
   .tab-panel { display: none; animation: fadeIn 0.2s ease-out; }
   .tab-panel.active { display: block; }
 
+  /* ── Copy button ── */
+  .copy-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 11px; font-size: 12px; font-weight: 500;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--muted); cursor: pointer;
+    font-family: var(--sans); transition: all .15s; user-select: none;
+  }
+  .copy-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .copy-btn.copied { border-color: #3fb950; color: #3fb950; }
+  .copy-icon { font-size: 14px; }
+
+  /* ── writeup section divider ── */
+  .writeup-divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 0;
+  }
+
   .status-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .status-form select { width: auto; padding: 7px 10px; font-size: 13px; }
-  .attachment-grid, .evidence-grid, .related-grid, .gap-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 12px;
-  }
-  .attachment-card, .evidence-card, .related-card, .gap-card, .summary-card {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-  }
+.attachment-grid, .evidence-grid, .related-grid, .gap-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.attachment-card, .evidence-card, .related-card, .gap-card, .summary-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  width: max-content;
+  max-width: 100%;
+}
   .attachment-card:hover, .evidence-card:hover, .related-card:hover { border-color: var(--border2); }
   .attachment-icon { font-size: 20px; flex-shrink: 0; }
   .attachment-name { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
@@ -203,8 +227,7 @@
 
   <div class="card">
     <div class="tabs">
-      <button class="tab-btn active" onclick="showTab('description', this)">Description</button>
-      <button class="tab-btn" onclick="showTab('poc', this)">PoC / Steps</button>
+      <button class="tab-btn active" onclick="showTab('writeup', this)">Write-up</button>
       <button class="tab-btn" onclick="showTab('hypothesis', this)">Linked Hypothesis</button>
       {% set evidence_total = (finding.evidence_records|length) + (report_pack.hypothesis_evidence|length) %}
       <button class="tab-btn" onclick="showTab('evidence', this)" id="evidence-tab-btn">Evidence{% if evidence_total %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ evidence_total }}</span>{% endif %}</button>
@@ -214,21 +237,47 @@
       <button class="tab-btn" onclick="showTab('notes', this)" id="notes-tab-btn">Notes{% if finding.notes %}<span style="margin-left:4px;background:rgba(124,106,255,.2);color:var(--accent2);padding:1px 6px;border-radius:4px;font-size:11px">{{ finding.notes|length }}</span>{% endif %}</button>
     </div>
 
-    <div id="tab-description" class="tab-panel active">
-      {% if finding.description %}
-        <div class="md-body" id="md-description">{{ finding.description }}</div>
-      {% else %}
-        <div class="text-muted">No description.</div>
-      {% endif %}
-    </div>
+    <!-- ══ MERGED WRITE-UP TAB ══ -->
+    <div id="tab-writeup" class="tab-panel active">
+      <div style="display:flex;flex-direction:column;gap:0">
+        <!-- Description block -->
+        <div style="padding-bottom:22px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="section-label" style="margin-bottom:0">Description</div>
+            <button class="copy-btn" onclick="copySection('raw-description', this)">
+              <span class="copy-icon">⎘</span> Copy
+            </button>
+          </div>
+          {% if finding.description %}
+            {# Hidden raw markdown for copying #}
+            <textarea id="raw-description" style="display:none" readonly>{{ finding.description }}</textarea>
+            <div class="md-body" id="md-description">{{ finding.description }}</div>
+          {% else %}
+            <div class="text-muted">No description.</div>
+          {% endif %}
+        </div>
 
-    <div id="tab-poc" class="tab-panel">
-      {% if finding.poc %}
-        <div class="md-body" id="md-poc">{{ finding.poc }}</div>
-      {% else %}
-        <div class="text-muted">No PoC written yet.</div>
-      {% endif %}
+        <hr class="writeup-divider">
+
+        <!-- PoC block -->
+        <div style="padding-top:22px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="section-label" style="margin-bottom:0">PoC / Steps</div>
+            <button class="copy-btn" onclick="copySection('raw-poc', this)">
+              <span class="copy-icon">⎘</span> Copy
+            </button>
+          </div>
+          {% if finding.poc %}
+            <textarea id="raw-poc" style="display:none" readonly>{{ finding.poc }}</textarea>
+            <div class="md-body" id="md-poc">{{ finding.poc }}</div>
+          {% else %}
+            <div class="text-muted">No PoC written yet.</div>
+          {% endif %}
+        </div>
+
+      </div>
     </div>
+    <!-- ══ END WRITE-UP ══ -->
 
     <div id="tab-hypothesis" class="tab-panel">
       {% if report_pack.linked_hypothesis %}
@@ -471,6 +520,8 @@
         </form>
       </div>
     </div>
+    <button class="copy-btn" onclick="copyAll(this)"><span class="copy-icon">⎘</span> Copy All</button>
+
   </div>
 
   <div class="danger-zone">
@@ -505,6 +556,32 @@
     btn.classList.add('active');
   }
 
+  // Copy raw markdown from hidden textarea
+  function copySection(rawId, btn) {
+    const ta = document.getElementById(rawId);
+    if (!ta) return;
+    navigator.clipboard.writeText(ta.value).then(() => {
+      btn.classList.add('copied');
+      btn.innerHTML = '<span class="copy-icon">✓</span> Copied!';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<span class="copy-icon">⎘</span> Copy';
+      }, 2000);
+    });
+  }
+  function copyAll(btn) {
+    const desc = document.getElementById('raw-description')?.value || '';
+    const poc  = document.getElementById('raw-poc')?.value || '';
+    const combined = [desc, poc].filter(Boolean).join('\n\n---\n\n');
+    navigator.clipboard.writeText(combined).then(() => {
+      btn.classList.add('copied');
+      btn.innerHTML = '<span class="copy-icon">✓</span> Copied!';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<span class="copy-icon">⎘</span> Copy All';
+      }, 2000);
+    });
+  }
   const hashToTab = {
     '#notes': 'notes-tab-btn',
     '#evidence': 'evidence-tab-btn',
