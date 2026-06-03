@@ -6,6 +6,7 @@ on:
 
 jobs:
   notify:
+    environment: 'bb-huge🤗 .env'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -46,4 +47,5 @@ jobs:
         run: |
           python .github/assets/discord_webhook_notify.py \
             --event-path "$GITHUB_EVENT_PATH" \
-            --event-type release
+            --event-type release \
+            --webhook "${{ secrets.DISCORD_RELEASES_WEBHOOK }}"

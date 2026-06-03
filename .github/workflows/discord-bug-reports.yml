@@ -6,10 +6,8 @@ on:
 
 jobs:
   notify:
+    environment: 'bb-huge🤗 .env'
     runs-on: ubuntu-latest
-    if: >-
-      (github.event.action == 'labeled' && github.event.label.name == 'bug') ||
-      (contains(github.event.issue.labels.*.name, 'bug'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,7 +17,24 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Cache pip
+      - name: Detect 'bug' label on issue
+        id: detect
+        run: |
+          python - <<'PY'
+import json, os
+e = json.load(open(os.environ['GITHUB_EVENT_PATH']))
+labels = [l.get('name','') for l in e.get('issue',{}).get('labels',[])]
+print('true' if 'bug' in labels else 'false')
+PY
+          echo "is_bug=$(python - <<'PY'
+import json, os
+e = json.load(open(os.environ['GITHUB_EVENT_PATH']))
+labels = [l.get('name','') for l in e.get('issue',{}).get('labels',[])]
+print('true' if 'bug' in labels else 'false')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Set up cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -28,9 +43,11 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install Python dependencies
+        if: steps.detect.outputs.is_bug == 'true'
         run: python -m pip install --upgrade pip && python -m pip install -r .github/assets/requirements.txt
 
       - name: Debug event & secret
+        if: steps.detect.outputs.is_bug == 'true'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_BUG_REPORTS_WEBHOOK }}
         run: |
@@ -44,9 +61,11 @@ jobs:
           if [ -n "$DISCORD_WEBHOOK" ]; then echo "DISCORD_WEBHOOK present"; else echo "DISCORD_WEBHOOK MISSING"; fi
 
       - name: Post to #bug-reports
+        if: steps.detect.outputs.is_bug == 'true'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_BUG_REPORTS_WEBHOOK }}
         run: |
           python .github/assets/discord_webhook_notify.py \
             --event-path "$GITHUB_EVENT_PATH" \
-            --event-type bug
+            --event-type bug \
+            --webhook "${{ secrets.DISCORD_BUG_REPORTS_WEBHOOK }}"
