@@ -2,7 +2,7 @@ name: Discord — Bug Reports
 
 on:
   issues:
-    types: [opened, closed, reopened]
+    types: [opened, closed, reopened, labeled]
 
 jobs:
   notify:
@@ -29,10 +29,8 @@ jobs:
         run: python -m pip install --upgrade pip && python -m pip install -r .github/assets/requirements.txt
 
       - name: Post to #bug-reports
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_BUG_REPORTS_WEBHOOK }}
         run: |
           python .github/assets/discord_webhook_notify.py \
             --event-path "$GITHUB_EVENT_PATH" \
             --event-type bug \
-            --webhook "$DISCORD_WEBHOOK"
+            --webhook "${{ secrets.DISCORD_BUG_REPORTS_WEBHOOK }}"

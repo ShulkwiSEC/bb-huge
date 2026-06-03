@@ -141,7 +141,21 @@ def main():
     args = parser.parse_args()
 
     if not args.webhook:
-        parser.error("Discord webhook URL is required via --webhook or DISCORD_WEBHOOK environment variable.")
+        fallback_vars = {
+            "bug": "DISCORD_BUG_REPORTS_WEBHOOK",
+            "feature": "DISCORD_FEATURE_REQUESTS_WEBHOOK",
+            "release": "DISCORD_RELEASES_WEBHOOK",
+            "commits": "DISCORD_COMMITS_WEBHOOK",
+        }
+        fallback_env = fallback_vars.get(args.event_type)
+        if fallback_env:
+            args.webhook = os.environ.get(fallback_env)
+
+    if not args.webhook:
+        parser.error(
+            "Discord webhook URL is required via --webhook, DISCORD_WEBHOOK, "
+            "or event-specific webhook environment variable."
+        )
 
     event = load_event(args.event_path)
 
