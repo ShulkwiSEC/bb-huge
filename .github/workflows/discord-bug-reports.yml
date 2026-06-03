@@ -2,14 +2,14 @@ name: Discord — Bug Reports
 
 on:
   issues:
-    types: [opened, labeled, reopened]
+    types: [labeled, reopened]
 
 jobs:
   notify:
     environment: 'bb-huge🤗 .env'
     if: |
       (github.event.action == 'labeled' && github.event.label.name == 'bug') ||
-      (github.event.action != 'labeled' && contains(github.event.issue.labels.*.name, 'bug'))
+      (github.event.action == 'reopened' && contains(github.event.issue.labels.*.name, 'bug'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
