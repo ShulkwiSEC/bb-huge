@@ -1,0 +1,55 @@
+{
+  "name": "bb-huge🤗",
+  "short_name": "bb-huge🤗",
+  "description": "bb-huge 🤗 , Personal bug bounty findings hub and bug bounty orchestration for multiple agents",
+  "start_url": "/",
+  "lang": "en-US",
+  "dir": "ltr",
+  "orientation": "portrait",
+  "scope": "/",
+  "id": "/",
+  "version": "1.0",
+  "shortcuts": [
+    {
+      "name": "Open bb-huge🤗",
+      "short_name": "bb-huge🤗",
+      "description": "Open bb-huge🤗 dashboard",
+      "url": "/"
+    },
+    {
+      "name": "Findings",
+      "short_name": "bb-huge🤗 Findings",
+      "description": "View your bug bounty findings",
+      "url": "/findings"
+    },
+    {
+      "name": "Settings",
+      "short_name": "bb-huge🤗 Settings",
+      "description": "View and manage your settings",
+      "url": "/settings"
+    },
+    {
+      "name": "programs",
+      "short_name": "bb-huge🤗 Programs",
+      "description": "View and manage your programs",
+      "url": "/programs"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/static/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "theme_color": "#07070d",
+  "background_color": "#0d0d18",
+  "display": "standalone"
+}
