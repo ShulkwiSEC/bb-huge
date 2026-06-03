@@ -1,0 +1,31 @@
+name: Discord — Feature Requests (labeled)
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  notify:
+    environment: 'bb-huge🤗 .env'
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'enhancement'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r .github/assets/requirements.txt
+
+      - name: Post to #feature-requests (labeled)
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_FEATURE_REQUESTS_WEBHOOK }}
+        run: |
+          python .github/assets/discord_webhook_notify.py \
+            --event-path "$GITHUB_EVENT_PATH" \
+            --event-type feature \
+            --webhook "${{ secrets.DISCORD_FEATURE_REQUESTS_WEBHOOK }}"
