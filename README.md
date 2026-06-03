@@ -1,4 +1,9 @@
 # bb-huge 🤗
+
+> ### 🤗 Join the bb-huge Community!
+> Find friends, share ideas, and start discussions with pro bug bounty hunters and software developers/engineers. 
+> **[Join the bb-huge Discord Server](https://discord.gg/M4Wd5DAZMw)**
+
 > `/bb-huge` — one command. Senior Bug Hunter, loaded.
 Not a portal. A **Context Engineering Architecture** that converts your AI agent into a disciplined bug bounty hunter with a single slash command. The web UI is the visible tip — the real power is what happens inside the agent's brain when the skill fires.
 
