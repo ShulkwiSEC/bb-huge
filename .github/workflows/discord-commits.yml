@@ -9,39 +9,27 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('.github/assets/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r .github/assets/requirements.txt
+
       - name: Post Commits to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_COMMITS_WEBHOOK }}
         run: |
-          # Use jq to parse the JSON payload from GitHub safely
-          # This loops through every commit in the push event
-          echo '${{ toJson(github.event.commits) }}' | jq -c '.[]' | while read -r commit; do
-            
-            MSG=$(echo "$commit" | jq -r '.message')
-            # Extract subject (first line) and body
-            SUBJECT=$(echo "$MSG" | head -n 1 | cut -c 1-256)
-            DESC=$(echo "$MSG" | sed '1d' | cut -c 1-1024)
-            
-            # If the body is empty, provide a small placeholder
-            if [ -z "$DESC" ]; then DESC="No additional details provided."; fi
-
-            URL=$(echo "$commit" | jq -r '.url')
-            AUTHOR=$(echo "$commit" | jq -r '.author.username // .author.name')
-            SHA=$(echo "$commit" | jq -r '.id | .[0:7]')
-
-            curl -s -X POST "$DISCORD_WEBHOOK" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"embeds\": [{
-                  \"title\": \"🔨 Commit: ${SUBJECT}\",
-                  \"description\": \"${DESC}\",
-                  \"url\": \"${URL}\",
-                  \"color\": 3447003,
-                  \"fields\": [
-                    {\"name\": \"Author\", \"value\": \"${AUTHOR}\", \"inline\": true},
-                    {\"name\": \"Hash\", \"value\": \"\`${SHA}\`\", \"inline\": true}
-                  ],
-                  \"footer\": {\"text\": \"bb-huge / source-code\"}
-                }]
-              }"
-          done
+          python .github/assets/discord_webhook_notify.py \
+            --event-path "$GITHUB_EVENT_PATH" \
+            --event-type commits \
+            --webhook "$DISCORD_WEBHOOK"

@@ -9,36 +9,27 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.event.issue.labels.*.name, 'bug')
     steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('.github/assets/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r .github/assets/requirements.txt
+
       - name: Post to #bug-reports
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_BUG_REPORTS_WEBHOOK }}
         run: |
-          ACTION="${{ github.event.action }}"
-          case "$ACTION" in
-            opened)   COLOR=15158332  ;; # red
-            closed)   COLOR=5763719   ;; # green
-            reopened) COLOR=16776960  ;; # yellow
-            *)        COLOR=10197915  ;; # gray
-          esac
-
-          TITLE=$(echo '${{ github.event.issue.title }}' | head -c 256)
-          BODY=$(echo '${{ github.event.issue.body }}' | head -c 1024)
-          URL="${{ github.event.issue.html_url }}"
-          USER="${{ github.event.issue.user.login }}"
-          NUMBER="${{ github.event.issue.number }}"
-
-          curl -s -X POST "$DISCORD_WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"embeds\": [{
-                \"title\": \"🐛 [#${NUMBER}] ${TITLE}\",
-                \"description\": \"${BODY}\",
-                \"url\": \"${URL}\",
-                \"color\": ${COLOR},
-                \"fields\": [
-                  {\"name\": \"Status\",  \"value\": \"${ACTION}\",  \"inline\": true},
-                  {\"name\": \"Opened by\", \"value\": \"${USER}\", \"inline\": true}
-                ],
-                \"footer\": {\"text\": \"bb-huge / bug-report\"}
-              }]
-            }"
+          python .github/assets/discord_webhook_notify.py \
+            --event-path "$GITHUB_EVENT_PATH" \
+            --event-type bug \
+            --webhook "$DISCORD_WEBHOOK"
