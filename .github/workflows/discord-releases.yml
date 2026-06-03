@@ -12,23 +12,9 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
         run: |
-          set -euo pipefail
-
-          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
-            echo "DISCORD_WEBHOOK is not configured"
-            exit 1
-          fi
-
           TAG="${{ github.event.release.tag_name }}"
-          NAME=$(cat <<'EOF'
-          ${{ github.event.release.name }}
-          EOF
-          )
-          BODY=$(cat <<'EOF'
-          ${{ github.event.release.body }}
-          EOF
-          )
-          BODY=$(printf '%s' "$BODY" | head -c 1500)
+          NAME="${{ github.event.release.name }}"
+          BODY=$(echo '${{ github.event.release.body }}' | head -c 1500)
           URL="${{ github.event.release.html_url }}"
           AUTHOR="${{ github.event.release.author.login }}"
           PRERELEASE="${{ github.event.release.prerelease }}"
@@ -41,17 +27,19 @@ jobs:
             COLOR=1752220
           fi
 
-          PAYLOAD=$(jq -n \
-            --arg content "@everyone 🚀 **bb-huge ${TAG}** is out!" \
-            --arg title "🚀 ${NAME} (${TAG})" \
-            --arg description "$BODY" \
-            --arg url "$URL" \
-            --arg label "$LABEL" \
-            --arg author "$AUTHOR" \
-            --argjson color "${COLOR}" \
-            '{content:$content,embeds:[{title:$title,description:$description,url:$url,color:$color,fields:[{name:"Type",value:$label,inline:true},{name:"Released by",value:$author,inline:true}],footer:{text:"bb-huge / releases"}}]}'
-          )
-
           curl -s -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            -d "{
+              \"content\": \"@everyone 🚀 **bb-huge ${TAG}** is out!\",
+              \"embeds\": [{
+                \"title\": \"🚀 ${NAME} (${TAG})\",
+                \"description\": \"${BODY}\",
+                \"url\": \"${URL}\",
+                \"color\": ${COLOR},
+                \"fields\": [
+                  {\"name\": \"Type\",      \"value\": \"${LABEL}\",  \"inline\": true},
+                  {\"name\": \"Released by\",\"value\": \"${AUTHOR}\",\"inline\": true}
+                ],
+                \"footer\": {\"text\": \"bb-huge / releases\"}
+              }]
+            }"

@@ -13,13 +13,6 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_FEATURE_REQUESTS_WEBHOOK }}
         run: |
-          set -euo pipefail
-
-          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
-            echo "DISCORD_WEBHOOK is not configured"
-            exit 1
-          fi
-
           ACTION="${{ github.event.action }}"
           case "$ACTION" in
             opened)   COLOR=7419530   ;; # purple
@@ -28,32 +21,24 @@ jobs:
             *)        COLOR=10197915  ;; # gray
           esac
 
-          TITLE=$(cat <<'EOF'
-          ${{ github.event.issue.title }}
-          EOF
-          )
-          TITLE=$(printf '%s' "$TITLE" | head -c 256)
-
-          BODY=$(cat <<'EOF'
-          ${{ github.event.issue.body }}
-          EOF
-          )
-          BODY=$(printf '%s' "$BODY" | head -c 1024)
-
+          TITLE=$(echo '${{ github.event.issue.title }}' | head -c 256)
+          BODY=$(echo '${{ github.event.issue.body }}' | head -c 1024)
           URL="${{ github.event.issue.html_url }}"
           USER="${{ github.event.issue.user.login }}"
           NUMBER="${{ github.event.issue.number }}"
 
-          PAYLOAD=$(jq -n \
-            --arg title "💡 [#${NUMBER}] $TITLE" \
-            --arg description "$BODY" \
-            --arg url "$URL" \
-            --arg action "$ACTION" \
-            --arg user "$USER" \
-            --argjson color "${COLOR}" \
-            '{embeds:[{title:$title,description:$description,url:$url,color:$color,fields:[{name:"Status",value:$action,inline:true},{name:"Opened by",value:$user,inline:true}],footer:{text:"bb-huge / feature-request"}}]}'
-          )
-
           curl -s -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            -d "{
+              \"embeds\": [{
+                \"title\": \"💡 [#${NUMBER}] ${TITLE}\",
+                \"description\": \"${BODY}\",
+                \"url\": \"${URL}\",
+                \"color\": ${COLOR},
+                \"fields\": [
+                  {\"name\": \"Status\",    \"value\": \"${ACTION}\",  \"inline\": true},
+                  {\"name\": \"Opened by\", \"value\": \"${USER}\",   \"inline\": true}
+                ],
+                \"footer\": {\"text\": \"bb-huge / feature-request\"}
+              }]
+            }"
