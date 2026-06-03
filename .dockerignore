@@ -17,3 +17,4 @@ dist/
 build/
 phase1.patch
 *.rej
+discord_server_init.py

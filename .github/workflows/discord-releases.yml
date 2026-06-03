@@ -1,0 +1,45 @@
+name: Discord — Releases
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to #releases
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          NAME="${{ github.event.release.name }}"
+          BODY=$(echo '${{ github.event.release.body }}' | head -c 1500)
+          URL="${{ github.event.release.html_url }}"
+          AUTHOR="${{ github.event.release.author.login }}"
+          PRERELEASE="${{ github.event.release.prerelease }}"
+
+          if [ "$PRERELEASE" = "true" ]; then
+            LABEL="Pre-release"
+            COLOR=16776960
+          else
+            LABEL="Release"
+            COLOR=1752220
+          fi
+
+          curl -s -X POST "$DISCORD_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"content\": \"@everyone 🚀 **bb-huge ${TAG}** is out!\",
+              \"embeds\": [{
+                \"title\": \"🚀 ${NAME} (${TAG})\",
+                \"description\": \"${BODY}\",
+                \"url\": \"${URL}\",
+                \"color\": ${COLOR},
+                \"fields\": [
+                  {\"name\": \"Type\",      \"value\": \"${LABEL}\",  \"inline\": true},
+                  {\"name\": \"Released by\",\"value\": \"${AUTHOR}\",\"inline\": true}
+                ],
+                \"footer\": {\"text\": \"bb-huge / releases\"}
+              }]
+            }"

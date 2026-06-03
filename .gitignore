@@ -20,3 +20,4 @@ app/static/uploads/*
 .omo
 [0-9][0-9]-*
 .understand-anything/
+discord_server_init.py
