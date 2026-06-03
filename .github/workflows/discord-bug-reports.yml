@@ -2,10 +2,12 @@ name: Discord — Bug Reports
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened, labeled, reopened]
 
 jobs:
   notify:
+    environment: 'bb-huge🤗 .env'
+    if: contains(github.event.issue.labels.*.name, 'bug')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -16,46 +18,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Detect 'bug' label
-        id: detect
-        run: |
-          python - <<'PY'
-import json, os
-path = os.environ.get('GITHUB_EVENT_PATH')
-if not path:
-    print('false')
-    sys.exit(0)
-e = json.load(open(path))
-action = e.get('action')
-# If this was a labeled event, the label is at event['label']
-if action == 'labeled' and e.get('label', {}).get('name') == 'bug':
-    print('true')
-else:
-    labels = [l.get('name','') for l in e.get('issue', {}).get('labels', [])]
-    print('true' if 'bug' in labels else 'false')
-PY
-          echo "is_bug=$(python - <<'PY'
-import json, os, sys
-path = os.environ.get('GITHUB_EVENT_PATH')
-if not path:
-    print('false')
-    sys.exit(0)
-e = json.load(open(path))
-action = e.get('action')
-if action == 'labeled' and e.get('label', {}).get('name') == 'bug':
-    print('true')
-else:
-    labels = [l.get('name','') for l in e.get('issue', {}).get('labels', [])]
-    print('true' if 'bug' in labels else 'false')
-PY
-)" >> $GITHUB_OUTPUT
-
       - name: Install Python dependencies
-        if: steps.detect.outputs.is_bug == 'true'
-        run: python -m pip install --upgrade pip && python -m pip install -r .github/assets/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r .github/assets/requirements.txt
 
       - name: Post to #bug-reports
-        if: steps.detect.outputs.is_bug == 'true'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_BUG_REPORTS_WEBHOOK }}
         run: |

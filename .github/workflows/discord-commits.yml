@@ -3,7 +3,7 @@ name: Discord — Commits
 on:
   push:
     branches:
-      - main  # Or your default branch
+      - main
 
 jobs:
   notify:
@@ -18,29 +18,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('.github/assets/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
       - name: Install Python dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -r .github/assets/requirements.txt
-
-      - name: Debug event & secret
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_COMMITS_WEBHOOK }}
         run: |
-          echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
-          if [ -f "$GITHUB_EVENT_PATH" ]; then
-            echo "Event file size: $(wc -c < \"$GITHUB_EVENT_PATH\")"
-            head -c 400 "$GITHUB_EVENT_PATH" | sed -n '1,40p'
-          else
-            echo "Event file missing: $GITHUB_EVENT_PATH"
-          fi
-          if [ -n "$DISCORD_WEBHOOK" ]; then echo "DISCORD_WEBHOOK present"; else echo "DISCORD_WEBHOOK MISSING"; fi
+          python -m pip install --upgrade pip
+          python -m pip install -r .github/assets/requirements.txt
 
       - name: Post Commits to Discord
         env:
