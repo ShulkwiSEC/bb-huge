@@ -13,35 +13,43 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_COMMITS_WEBHOOK }}
         run: |
-          # Use jq to parse the JSON payload from GitHub safely
-          # This loops through every commit in the push event
-          echo '${{ toJson(github.event.commits) }}' | jq -c '.[]' | while read -r commit; do
-            
-            MSG=$(echo "$commit" | jq -r '.message')
-            # Extract subject (first line) and body
-            SUBJECT=$(echo "$MSG" | head -n 1 | cut -c 1-256)
-            DESC=$(echo "$MSG" | sed '1d' | cut -c 1-1024)
-            
-            # If the body is empty, provide a small placeholder
-            if [ -z "$DESC" ]; then DESC="No additional details provided."; fi
+          set -euo pipefail
 
-            URL=$(echo "$commit" | jq -r '.url')
-            AUTHOR=$(echo "$commit" | jq -r '.author.username // .author.name')
-            SHA=$(echo "$commit" | jq -r '.id | .[0:7]')
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "DISCORD_WEBHOOK is not configured"
+            exit 1
+          fi
+
+          COMMITS_JSON=$(cat <<'EOF'
+          ${{ toJson(github.event.commits) }}
+          EOF
+          )
+
+          echo "$COMMITS_JSON" | jq -c '.[]' | while read -r commit; do
+            MSG=$(jq -r '.message' <<<"$commit")
+            SUBJECT=$(printf '%s' "$MSG" | head -n 1 | cut -c 1-256)
+            DESC=$(printf '%s' "$MSG" | sed '1d' | cut -c 1-1024)
+
+            if [ -z "$DESC" ]; then
+              DESC="No additional details provided."
+            fi
+
+            URL=$(jq -r '.url' <<<"$commit")
+            AUTHOR=$(jq -r '.author.username // .author.name // .author.email // "unknown"' <<<"$commit")
+            SHA=$(jq -r '.id | .[0:7]' <<<"$commit")
+            HASH="\`$SHA\`"
+
+            PAYLOAD=$(jq -n \
+              --arg title "🔨 Commit: $SUBJECT" \
+              --arg description "$DESC" \
+              --arg url "$URL" \
+              --arg author "$AUTHOR" \
+              --arg hash "$HASH" \
+              --argjson color 3447003 \
+              '{embeds:[{title:$title,description:$description,url:$url,color:$color,fields:[{name:"Author",value:$author,inline:true},{name:"Hash",value:$hash,inline:true}],footer:{text:"bb-huge / source-code"}}]}'
+            )
 
             curl -s -X POST "$DISCORD_WEBHOOK" \
               -H "Content-Type: application/json" \
-              -d "{
-                \"embeds\": [{
-                  \"title\": \"🔨 Commit: ${SUBJECT}\",
-                  \"description\": \"${DESC}\",
-                  \"url\": \"${URL}\",
-                  \"color\": 3447003,
-                  \"fields\": [
-                    {\"name\": \"Author\", \"value\": \"${AUTHOR}\", \"inline\": true},
-                    {\"name\": \"Hash\", \"value\": \"\`${SHA}\`\", \"inline\": true}
-                  ],
-                  \"footer\": {\"text\": \"bb-huge / source-code\"}
-                }]
-              }"
+              -d "$PAYLOAD"
           done
