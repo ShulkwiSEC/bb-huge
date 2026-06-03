@@ -1,12 +1,11 @@
-name: Discord — Feature Requests (opened)
+name: Discord — Feature Requests
 
 on:
   issues:
-    types: [opened]
+    types: [opened, labeled]
 
 jobs:
   notify:
-    environment: 'bb-huge🤗 .env'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -17,20 +16,36 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Detect 'enhancement' label on opened issue
+      - name: Detect 'enhancement' label
         id: detect
         run: |
           python - <<'PY'
-import json, os
-e = json.load(open(os.environ['GITHUB_EVENT_PATH']))
-labels = [l.get('name','') for l in e.get('issue',{}).get('labels',[])]
-print('true' if 'enhancement' in labels else 'false')
+import json, os, sys
+path = os.environ.get('GITHUB_EVENT_PATH')
+if not path:
+    print('false')
+    sys.exit(0)
+e = json.load(open(path))
+action = e.get('action')
+if action == 'labeled' and e.get('label', {}).get('name') == 'enhancement':
+    print('true')
+else:
+    labels = [l.get('name','') for l in e.get('issue', {}).get('labels', [])]
+    print('true' if 'enhancement' in labels else 'false')
 PY
           echo "is_enhancement=$(python - <<'PY'
-import json, os
-e = json.load(open(os.environ['GITHUB_EVENT_PATH']))
-labels = [l.get('name','') for l in e.get('issue',{}).get('labels',[])]
-print('true' if 'enhancement' in labels else 'false')
+import json, os, sys
+path = os.environ.get('GITHUB_EVENT_PATH')
+if not path:
+    print('false')
+    sys.exit(0)
+e = json.load(open(path))
+action = e.get('action')
+if action == 'labeled' and e.get('label', {}).get('name') == 'enhancement':
+    print('true')
+else:
+    labels = [l.get('name','') for l in e.get('issue', {}).get('labels', [])]
+    print('true' if 'enhancement' in labels else 'false')
 PY
 )" >> $GITHUB_OUTPUT
 
