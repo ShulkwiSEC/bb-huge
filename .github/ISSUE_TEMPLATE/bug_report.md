@@ -26,5 +26,8 @@ assignees: ''
 - bb-huge version / commit: 
 - Agent (gemini-cli / claude-code / other): 
 
+## Attachments
+<!-- Screenshots, agent output, log files, burp requests — drop them here. -->
+
 ## Additional context
-<!-- Screenshots, log output, config snippets — anything helpful. -->
+<!-- Anything else that helps. -->
