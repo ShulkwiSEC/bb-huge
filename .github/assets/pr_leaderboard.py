@@ -3,8 +3,8 @@
 bb-huge PR Leaderboard
 - PR opened  → +1 point
 - PR merged  → +1 point (total 2 for full cycle)
-Stores state in .github/assets/pr-leaderboard.json
-Sends leaderboard embed to Discord on every event
+- Edits the same Discord message every time (PATCH via webhook)
+- Stores state + message_id in .github/assets/pr-leaderboard.json
 """
 import argparse
 import json
@@ -28,7 +28,7 @@ def load_leaderboard():
     if LEADERBOARD_PATH.exists():
         with open(LEADERBOARD_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {}
+    return {"message_id": None, "scores": {}}
 
 
 def save_leaderboard(data):
@@ -43,14 +43,11 @@ def load_event(path):
 
 
 def build_progress_bar(score, max_score):
-    if max_score == 0:
-        filled = 0
-    else:
-        filled = round((score / max_score) * BAR_LENGTH)
+    filled = round((score / max_score) * BAR_LENGTH) if max_score else 0
     return BAR_FILLED * filled + BAR_EMPTY * (BAR_LENGTH - filled)
 
 
-def build_leaderboard_embed(scores, event_action, contributor, pr_title, pr_url):
+def build_content(scores, event_action, contributor, pr_title, pr_url):
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     max_score = sorted_scores[0][1] if sorted_scores else 1
 
@@ -60,31 +57,41 @@ def build_leaderboard_embed(scores, event_action, contributor, pr_title, pr_url)
         bar = build_progress_bar(pts, max_score)
         rows.append(f"{medal} **{user}**\n`{bar}` {pts} pts")
 
-    board_text = "\n".join(rows) if rows else "No contributions yet."
+    board_text = "\n".join(rows) if rows else "*No contributions yet.*"
 
     if event_action == "opened":
         action_line = f"📬 **{contributor}** opened a PR — +1 pt"
-        color = 3447003  # blue
     else:
         action_line = f"🎉 **{contributor}** got a PR merged — +1 pt"
-        color = 5763719  # green
 
-    return {
-        "embeds": [
-            {
-                "title": "🏆 bb-huge PR Warriors",
-                "description": f"{action_line}\n> [{pr_title}]({pr_url})\n\n{board_text}",
-                "color": color,
-                "footer": {"text": "bb-huge / pr-warriors"},
-            }
-        ]
-    }
+    pr_link = f"[{pr_title}]({pr_url})"
+
+    return f"🏆 **bb-huge PR Warriors**\n\n{action_line}\n> {pr_link}\n\n{board_text}"
 
 
-def send_webhook(url, payload):
-    r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
-    if not r.ok:
-        raise RuntimeError(f"Webhook failed {r.status_code}: {r.text.strip()}")
+def parse_webhook_id_token(webhook_url):
+    # https://discord.com/api/webhooks/{id}/{token}
+    parts = webhook_url.rstrip("/").split("/")
+    return parts[-2], parts[-1]
+
+
+def send_or_edit(webhook_url, content, message_id=None):
+    webhook_id, webhook_token = parse_webhook_id_token(webhook_url)
+
+    if message_id:
+        # PATCH — edit existing message
+        url = f"https://discord.com/api/webhooks/{webhook_id}/{webhook_token}/messages/{message_id}"
+        r = requests.patch(url, json={"content": content}, timeout=30)
+        if not r.ok:
+            raise RuntimeError(f"PATCH failed {r.status_code}: {r.text.strip()}")
+        return message_id
+    else:
+        # POST — first time, capture message_id
+        url = f"https://discord.com/api/webhooks/{webhook_id}/{webhook_token}?wait=true"
+        r = requests.post(url, json={"content": content}, timeout=30)
+        if not r.ok:
+            raise RuntimeError(f"POST failed {r.status_code}: {r.text.strip()}")
+        return str(r.json()["id"])
 
 
 def main():
@@ -103,13 +110,16 @@ def main():
     pr_title = pr.get("title", "No title")
     pr_url = pr.get("html_url", "")
 
-    scores = load_leaderboard()
-    scores[contributor] = scores.get(contributor, 0) + 1
-    save_leaderboard(scores)
+    data = load_leaderboard()
+    data["scores"][contributor] = data["scores"].get(contributor, 0) + 1
 
-    payload = build_leaderboard_embed(scores, args.event_action, contributor, pr_title, pr_url)
-    send_webhook(args.webhook, payload)
-    print(f"✅ Leaderboard updated — {contributor} now has {scores[contributor]} pts")
+    content = build_content(data["scores"], args.event_action, contributor, pr_title, pr_url)
+    message_id = send_or_edit(args.webhook, content, data.get("message_id"))
+
+    data["message_id"] = message_id
+    save_leaderboard(data)
+
+    print(f"✅ Leaderboard updated — {contributor} now has {data['scores'][contributor]} pts")
 
 
 if __name__ == "__main__":
