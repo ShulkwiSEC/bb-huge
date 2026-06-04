@@ -1,102 +1,187 @@
 #!/usr/bin/env python3
-"""
-bb-huge PR Leaderboard
-- PR opened  → +1 point
-- PR merged  → +1 point (total 2 for full cycle)
-Stores state in .github/assets/leaderboard.json
-Sends leaderboard embed to Discord on every event
-"""
 import argparse
 import json
 import os
+import re
 import sys
-from pathlib import Path
 
 try:
     import requests
 except ImportError:
-    sys.exit("requests is required. pip install requests")
+    sys.exit("The 'requests' package is required. Install dependencies from .github/assets/requirements.txt")
 
-LEADERBOARD_PATH = Path(".github/assets/leaderboard.json")
-MEDALS = ["🥇", "🥈", "🥉"]
-
-
-def load_leaderboard():
-    if LEADERBOARD_PATH.exists():
-        with open(LEADERBOARD_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+MAX_TITLE = 256
+MAX_DESCRIPTION = 4096
+MAX_FIELD = 1024
+COMMIT_HASH_LENGTH = 7
 
 
-def save_leaderboard(data):
-    LEADERBOARD_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(LEADERBOARD_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+def normalize_text(value):
+    if value is None:
+        return ""
+    text = str(value)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"\x00", "", text)
+    return text
+
+
+def truncate(text, limit):
+    if limit is None:
+        return text
+    return text[:limit]
 
 
 def load_event(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with open(path, "r", encoding="utf-8") as handle:
+        return json.load(handle)
 
 
-def build_leaderboard_embed(scores, event_action, contributor, pr_title, pr_url, points_earned):
-    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+def send_webhook(url, payload):
+    response = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+    if not response.ok:
+        raise RuntimeError(
+            f"Webhook request failed with status {response.status_code}: {response.text.strip()}"
+        )
 
-    rows = []
-    for i, (user, pts) in enumerate(sorted_scores[:10]):
-        medal = MEDALS[i] if i < 3 else f"`#{i+1}`"
-        rows.append(f"{medal} **{user}** — {pts} pts")
 
-    board_text = "\n".join(rows) if rows else "No contributions yet."
-
-    if event_action == "opened":
-        action_line = f"📬 **{contributor}** opened a PR (+1 pt)"
-        color = 3447003  # blue
-    else:
-        action_line = f"🎉 **{contributor}** got a PR merged (+1 pt)"
-        color = 5763719  # green
+def build_issue_payload(event, title_prefix, footer_text, color):
+    issue = event.get("issue", {})
+    title_text = truncate(normalize_text(issue.get("title")), MAX_TITLE)
+    body_text = truncate(normalize_text(issue.get("body")), MAX_DESCRIPTION)
+    action = normalize_text(event.get("action", "unknown"))
+    url = normalize_text(issue.get("html_url"))
+    user = normalize_text(issue.get("user", {}).get("login"))
+    number = issue.get("number")
 
     return {
         "embeds": [
             {
-                "title": "🏆 bb-huge Contributor Leaderboard",
-                "description": f"{action_line}\n[{pr_title}]({pr_url})\n\n{board_text}",
+                "title": f"{title_prefix} [#{number}] {title_text}",
+                "description": body_text,
+                "url": url,
                 "color": color,
-                "footer": {"text": "bb-huge / contributors"},
+                "fields": [
+                    {"name": "Status", "value": action, "inline": True},
+                    {"name": "Opened by", "value": user, "inline": True},
+                ],
+                "footer": {"text": footer_text},
             }
         ]
     }
 
 
-def send_webhook(url, payload):
-    r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
-    if not r.ok:
-        raise RuntimeError(f"Webhook failed {r.status_code}: {r.text.strip()}")
+def build_release_payload(event):
+    release = event.get("release", {})
+    tag = normalize_text(release.get("tag_name"))
+    name = truncate(normalize_text(release.get("name")) or tag, MAX_TITLE)
+    body_text = truncate(normalize_text(release.get("body")), MAX_DESCRIPTION)
+    url = normalize_text(release.get("html_url"))
+    author = normalize_text(release.get("author", {}).get("login"))
+    prerelease = release.get("prerelease", False)
+
+    label = "Pre-release" if prerelease else "Release"
+    color = 16776960 if prerelease else 1752220
+
+    return {
+        "content": f"@everyone 🚀 **bb-huge {tag}** is out!",
+        "embeds": [
+            {
+                "title": f"🚀 {name} ({tag})",
+                "description": body_text,
+                "url": url,
+                "color": color,
+                "fields": [
+                    {"name": "Type", "value": label, "inline": True},
+                    {"name": "Released by", "value": author, "inline": True},
+                ],
+                "footer": {"text": "bb-huge / releases"},
+            }
+        ],
+    }
+
+
+def build_commit_payload(commit):
+    message = normalize_text(commit.get("message", ""))
+    lines = message.split("\n")
+    subject = truncate(lines[0] if lines else "No commit message", MAX_TITLE)
+    body = normalize_text("\n".join(lines[1:])).strip()
+    if not body:
+        body = "No additional details provided."
+    url = normalize_text(commit.get("url"))
+    author = normalize_text(
+        commit.get("author", {}).get("username")
+        or commit.get("author", {}).get("name")
+        or commit.get("author", {}).get("email")
+        or "unknown"
+    )
+    sha = normalize_text(commit.get("id", ""))[:COMMIT_HASH_LENGTH]
+
+    return {
+        "embeds": [
+            {
+                "title": f"🔨 Commit: {subject}",
+                "description": truncate(body, MAX_DESCRIPTION),
+                "url": url,
+                "color": 3447003,
+                "fields": [
+                    {"name": "Author", "value": author, "inline": True},
+                    {"name": "Hash", "value": f"`{sha}`", "inline": True},
+                ],
+                "footer": {"text": "bb-huge / source-code"},
+            }
+        ]
+    }
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--event-path", required=True)
-    parser.add_argument("--event-action", required=True, choices=["opened", "merged"])
-    parser.add_argument("--webhook", default=os.environ.get("DISCORD_PR_LEADERBOARD_WEBHOOK"))
+    parser = argparse.ArgumentParser(description="Send GitHub event notifications to Discord via webhook.")
+    parser.add_argument("--event-path", required=True, help="Path to the GitHub event JSON file.")
+    parser.add_argument("--event-type", required=True, choices=["bug", "feature", "release", "commits"], help="Type of notification to send.")
+    parser.add_argument("--webhook", default=os.environ.get("DISCORD_WEBHOOK"), help="Discord webhook URL.")
     args = parser.parse_args()
 
     if not args.webhook:
-        sys.exit("DISCORD_PR_LEADERBOARD_WEBHOOK is required.")
+        fallback_vars = {
+            "bug": "DISCORD_BUG_REPORTS_WEBHOOK",
+            "feature": "DISCORD_FEATURE_REQUESTS_WEBHOOK",
+            "release": "DISCORD_RELEASES_WEBHOOK",
+            "commits": "DISCORD_COMMITS_WEBHOOK",
+        }
+        fallback_env = fallback_vars.get(args.event_type)
+        if fallback_env:
+            args.webhook = os.environ.get(fallback_env)
+
+    if not args.webhook:
+        parser.error(
+            "Discord webhook URL is required via --webhook, DISCORD_WEBHOOK, "
+            "or event-specific webhook environment variable."
+        )
 
     event = load_event(args.event_path)
-    pr = event.get("pull_request", {})
-    contributor = pr.get("user", {}).get("login", "unknown")
-    pr_title = pr.get("title", "No title")
-    pr_url = pr.get("html_url", "")
 
-    scores = load_leaderboard()
-    scores[contributor] = scores.get(contributor, 0) + 1
-    save_leaderboard(scores)
+    if args.event_type == "bug":
+        payload = build_issue_payload(event, "🐛", "bb-huge / bug-report", 15158332)
+        send_webhook(args.webhook, payload)
+        return
 
-    payload = build_leaderboard_embed(scores, args.event_action, contributor, pr_title, pr_url, 1)
-    send_webhook(args.webhook, payload)
-    print(f"✅ Leaderboard updated — {contributor} now has {scores[contributor]} pts")
+    if args.event_type == "feature":
+        payload = build_issue_payload(event, "💡", "bb-huge / feature-request", 7419530)
+        send_webhook(args.webhook, payload)
+        return
+
+    if args.event_type == "release":
+        payload = build_release_payload(event)
+        send_webhook(args.webhook, payload)
+        return
+
+    if args.event_type == "commits":
+        commits = event.get("commits", [])
+        for commit in commits:
+            payload = build_commit_payload(commit)
+            send_webhook(args.webhook, payload)
+        return
+
+    raise ValueError(f"Unsupported event type: {args.event_type}")
 
 
 if __name__ == "__main__":
