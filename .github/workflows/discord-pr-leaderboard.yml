@@ -32,7 +32,7 @@ jobs:
 
       - name: Update leaderboard & notify Discord
         env:
-          DISCORD_PR_WEBHOOK: ${{ secrets.DISCORD_PR_WEBHOOK }}
+          DISCORD_PR_LEADERBOARD_WEBHOOK: ${{ secrets.DISCORD_PR_LEADERBOARD_WEBHOOK }}
         run: |
           ACTION="${{ github.event.action }}"
           if [ "$ACTION" = "closed" ]; then
@@ -43,7 +43,7 @@ jobs:
           python .github/assets/pr_leaderboard.py \
             --event-path "$GITHUB_EVENT_PATH" \
             --event-action "$EVENT_ACTION" \
-            --webhook "$DISCORD_PR_WEBHOOK"
+            --webhook "$DISCORD_PR_LEADERBOARD_WEBHOOK"
 
       - name: Commit updated leaderboard
         run: |

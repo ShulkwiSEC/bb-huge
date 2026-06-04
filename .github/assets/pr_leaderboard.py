@@ -91,11 +91,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--event-path", required=True)
     parser.add_argument("--event-action", required=True, choices=["opened", "merged"])
-    parser.add_argument("--webhook", default=os.environ.get("DISCORD_PR_WEBHOOK"))
+    parser.add_argument("--webhook", default=os.environ.get("DISCORD_PR_LEADERBOARD_WEBHOOK"))
     args = parser.parse_args()
 
     if not args.webhook:
-        sys.exit("DISCORD_PR_WEBHOOK is required.")
+        sys.exit("DISCORD_PR_LEADERBOARD_WEBHOOK is required.")
 
     event = load_event(args.event_path)
     pr = event.get("pull_request", {})
