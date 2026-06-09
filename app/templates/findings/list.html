@@ -131,75 +131,99 @@
   <!-- Table -->
   <div class="card">
     {% if findings %}
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Title</th>
-            <th>Target / Platform</th>
-            <th>Program</th>
-            <th>Severity</th>
-            <th>CVSS</th>
-            <th>Status</th>
-            <th>Agent</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for f in findings %}
-          <tr>
-            <td class="mono text-muted" style="font-size:11px">{{ f.id }}</td>
-            <td class="finding-title">
-              <a href="{{ url_for('findings.detail', fid=f.id) }}">{{ f.title }}</a>
-            </td>
-            <td>
-              <div style="font-family:var(--mono);font-size:11px;color:var(--text)">{{ f.target }}</div>
-              <div style="font-size:11px;color:var(--muted)">{{ f.platform }}</div>
-            </td>
-            <td>
-              {% if f.program %}
-                <a href="{{ url_for('programs.detail', pid=f.program.id) }}" class="text-muted" style="font-size:11px;font-family:var(--mono);text-decoration:none;display:inline-flex;align-items:center;gap:6px">
-                  {% if f.program.logo_url %}
-                    <img src="{{ f.program.logo_url }}" alt="{{ f.program.name }} logo" style="width:18px;height:18px;border-radius:4px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">
-                  {% elif f.program.program_url %}
-                    <img src="https://www.google.com/s2/favicons?domain={{ f.program.program_url }}&sz=16" alt="favicon" style="width:14px;height:14px;border-radius:3px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">
-                  {% endif %}
-                  <span>{{ f.program.name }}</span>
-                </a>
-              {% else %}
-                <span class="text-muted" style="font-size:11px">—</span>
-              {% endif %}
-            </td>
-            <td><span class="badge badge-{{ f.severity }}">{{ f.severity }}</span></td>
-            <td>
-              {% if f.cvss %}
-                {% if f.cvss >= 9 %}
-                  <span class="cvss-val cvss-critical">{{ "%.1f"|format(f.cvss) }}</span>
-                {% elif f.cvss >= 7 %}
-                  <span class="cvss-val cvss-high">{{ "%.1f"|format(f.cvss) }}</span>
-                {% elif f.cvss >= 4 %}
-                  <span class="cvss-val cvss-medium">{{ "%.1f"|format(f.cvss) }}</span>
+    <form id="bulk-form" method="POST" action="{{ url_for('findings.bulk_action') }}">
+      <div style="padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; background: var(--bg2);">
+        <span style="font-size: 13px; font-weight: 500; color: var(--text);">Bulk Actions:</span>
+        <select name="action" style="padding: 5px 10px; font-size: 13px; min-width: 150px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+          <option value="">-- Select Action --</option>
+          <optgroup label="Change Status">
+            {% for s in statuses %}
+            <option value="status_{{ s }}">Set Status: {{ s }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Change Severity">
+            {% for s in severities %}
+            <option value="severity_{{ s }}">Set Severity: {{ s }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Danger Zone">
+            <option value="delete">Delete Selected</option>
+          </optgroup>
+        </select>
+        <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('Are you sure you want to apply this bulk action?')">Apply</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 30px; padding-right: 0;"><input type="checkbox" id="select-all"></th>
+              <th>#</th>
+              <th>Title</th>
+              <th>Target / Platform</th>
+              <th>Program</th>
+              <th>Severity</th>
+              <th>CVSS</th>
+              <th>Status</th>
+              <th>Agent</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in findings %}
+            <tr>
+              <td style="padding-right: 0;"><input type="checkbox" name="finding_ids" value="{{ f.id }}" class="row-checkbox"></td>
+              <td class="mono text-muted" style="font-size:11px">{{ f.id }}</td>
+              <td class="finding-title">
+                <a href="{{ url_for('findings.detail', fid=f.id) }}">{{ f.title }}</a>
+              </td>
+              <td>
+                <div style="font-family:var(--mono);font-size:11px;color:var(--text)">{{ f.target }}</div>
+                <div style="font-size:11px;color:var(--muted)">{{ f.platform }}</div>
+              </td>
+              <td>
+                {% if f.program %}
+                  <a href="{{ url_for('programs.detail', pid=f.program.id) }}" class="text-muted" style="font-size:11px;font-family:var(--mono);text-decoration:none;display:inline-flex;align-items:center;gap:6px">
+                    {% if f.program.logo_url %}
+                      <img src="{{ f.program.logo_url }}" alt="{{ f.program.name }} logo" style="width:18px;height:18px;border-radius:4px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">
+                    {% elif f.program.program_url %}
+                      <img src="https://www.google.com/s2/favicons?domain={{ f.program.program_url }}&sz=16" alt="favicon" style="width:14px;height:14px;border-radius:3px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">
+                    {% endif %}
+                    <span>{{ f.program.name }}</span>
+                  </a>
                 {% else %}
-                  <span class="cvss-val cvss-low">{{ "%.1f"|format(f.cvss) }}</span>
+                  <span class="text-muted" style="font-size:11px">—</span>
                 {% endif %}
-              {% else %}
-                <span class="text-muted">—</span>
-              {% endif %}
-            </td>
-            <td>
-              {% set sc = f.status.replace('/','').replace('-','') %}
-              <span class="badge badge-{{ sc }}">{{ f.status }}</span>
-            </td>
-            <td class="text-muted mono" style="font-size:11px">{{ f.agent }}</td>
-            <td class="text-muted" style="font-size:12px">
-              {{ f.created_at.strftime('%Y-%m-%d') if f.created_at else '—' }}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+              </td>
+              <td><span class="badge badge-{{ f.severity }}">{{ f.severity }}</span></td>
+              <td>
+                {% if f.cvss %}
+                  {% if f.cvss >= 9 %}
+                    <span class="cvss-val cvss-critical">{{ "%.1f"|format(f.cvss) }}</span>
+                  {% elif f.cvss >= 7 %}
+                    <span class="cvss-val cvss-high">{{ "%.1f"|format(f.cvss) }}</span>
+                  {% elif f.cvss >= 4 %}
+                    <span class="cvss-val cvss-medium">{{ "%.1f"|format(f.cvss) }}</span>
+                  {% else %}
+                    <span class="cvss-val cvss-low">{{ "%.1f"|format(f.cvss) }}</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% set sc = f.status.replace('/','').replace('-','') %}
+                <span class="badge badge-{{ sc }}">{{ f.status }}</span>
+              </td>
+              <td class="text-muted mono" style="font-size:11px">{{ f.agent }}</td>
+              <td class="text-muted" style="font-size:12px">
+                {{ f.created_at.strftime('%Y-%m-%d') if f.created_at else '—' }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
     {% else %}
       <div style="text-align:center;padding:60px;color:var(--muted)">
         {% if q or severity or status or agent or program_id %}
@@ -213,4 +237,15 @@
   </div>
 
 </div>
+<script>
+  const selectAll = document.getElementById('select-all');
+  if (selectAll) {
+    selectAll.addEventListener('change', function() {
+      const checkboxes = document.querySelectorAll('.row-checkbox');
+      for (const checkbox of checkboxes) {
+        checkbox.checked = this.checked;
+      }
+    });
+  }
+</script>
 {% endblock %}

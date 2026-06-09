@@ -416,6 +416,57 @@ def update_status(fid):
     return redirect(url_for("findings.detail", fid=fid))
 
 
+# ── Bulk Action ───────────────────────────────────────────────────────────────
+
+@findings_bp.route("/findings/bulk", methods=["POST"])
+@login_required
+def bulk_action():
+    action = request.form.get("action")
+    finding_ids = request.form.getlist("finding_ids")
+
+    if not action:
+        flash("No bulk action selected.", "warning")
+        return redirect(request.referrer or url_for("findings.list_findings"))
+    
+    if not finding_ids:
+        flash("No findings selected.", "warning")
+        return redirect(request.referrer or url_for("findings.list_findings"))
+
+    findings = Finding.query.filter(Finding.id.in_(finding_ids)).all()
+    count = 0
+
+    if action == "delete":
+        for finding in findings:
+            db.session.delete(finding)
+            count += 1
+        flash(f"Deleted {count} findings.", "info")
+    elif action.startswith("status_"):
+        new_status = action.replace("status_", "")
+        if new_status in STATUSES:
+            for finding in findings:
+                finding.status = new_status
+                finding.updated_at = datetime.now(timezone.utc)
+                count += 1
+            flash(f"Updated status to '{new_status}' for {count} findings.", "success")
+        else:
+            flash("Invalid status.", "error")
+    elif action.startswith("severity_"):
+        new_severity = action.replace("severity_", "")
+        if new_severity in SEVERITIES:
+            for finding in findings:
+                finding.severity = new_severity
+                finding.updated_at = datetime.now(timezone.utc)
+                count += 1
+            flash(f"Updated severity to '{new_severity}' for {count} findings.", "success")
+        else:
+            flash("Invalid severity.", "error")
+    else:
+        flash("Invalid action.", "error")
+
+    db.session.commit()
+    return redirect(request.referrer or url_for("findings.list_findings"))
+
+
 # ── Delete ────────────────────────────────────────────────────────────────────
 
 

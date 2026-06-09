@@ -21,3 +21,4 @@ app/static/uploads/*
 [0-9][0-9]-*
 .understand-anything/
 discord_server_init.py
+bb_huge_dataset_genrator_for_fine_tune.py

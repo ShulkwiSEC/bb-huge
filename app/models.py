@@ -540,7 +540,7 @@ class Asset(db.Model):
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
-    program = db.relationship("Program", backref=db.backref("assets", lazy=True))
+    program = db.relationship("Program", backref=db.backref("assets", lazy=True, cascade="all, delete-orphan"))
     endpoints = db.relationship(
         "Endpoint", backref="asset", lazy=True, cascade="all, delete-orphan"
     )
