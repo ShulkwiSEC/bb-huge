@@ -590,5 +590,6 @@ bb-huge/
 ---
 
 ## License
-
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+![Alt](https://repobeats.axiom.co/api/embed/140af8987c6ab2e19efa5edf9fff602f8b2a1704.svg "Repobeats analytics image")
