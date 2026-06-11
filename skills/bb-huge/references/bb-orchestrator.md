@@ -20,10 +20,25 @@ When you receive a task, route it to the correct reference file before acting:
 | "create or look up a program", "add recon to a program" | → Stay in `SKILL.md` (MCP tools) |
 | "log an observation or hypothesis", "attach evidence" | → Stay in `SKILL.md` (MCP tools) |
 | "promote observation to hypothesis" / "promote hypothesis to finding" | → Stay in `SKILL.md` (Evidence Pipeline) |
+| **Field-aware routing (determine field first)** | → See **Field Routing** below |
 
 **Load only the reference you need.** Do not load all files at once.
 
 Note: Program records can include a `logo_url` field. Agents creating programs may populate a public image URL to improve UI and report appearance. See `skills/bb-huge/SKILL.md` for guidance.
+
+### Field Routing
+
+Before routing a task, determine its **field discriminator** (web, mobile, binary, or source_code). This selects the appropriate methodology and reference files:
+
+| Field | Route To | Default Evidence Type |
+|-------|---------|---------------------|
+| `web` | `bb-recon.md` → `bb-eligible-vulnerabilities.md` (standard web flow) | `bb_attach_http_pair()` |
+| `mobile` | Mobile-specific methodology (JADX, MobSF, runtime testing) | `mobile_static_analysis` |
+| `binary` | Binary analysis methodology (Ghidra, IDA, dynamic analysis) | `binary_analysis_output`, `binary_ioc` |
+| `source_code` | Source review methodology (SAST, code review, dependency scan) | `source_code_vulnerability` |
+
+**Set `field` on every finding you create** via `bb_create_finding({..., field: "web"})`.
+Pass `field` to `bb_check_existing_work()` for field-scoped duplicate detection (+15 similarity weight for same field).
 
 ---
 
@@ -32,7 +47,7 @@ Note: Program records can include a `logo_url` field. Agents creating programs m
 When starting any new session or receiving a new target:
 
 ```
-1. bb_get_stats                        — check current portal state
+1. bb_get_stats                        — check current portal state (includes by_field breakdown)
 2. Load bb-operator.md                 — get the active methodology
 3. Load bb-standards.md                — confirm what's in scope
 4. bb_list_programs                    — check if target program exists in portal
@@ -41,9 +56,9 @@ When starting any new session or receiving a new target:
                                          recent recon + target context
 6. bb_get_context(program_id)          — load pre-hunt Q&A; if empty, run SOP-5
 7. If prior work exists → bb_get_finding + bb-dump-attachments.py
-8. bb_check_existing_work()            — cross-check across findings, observations,
-                                         and hypotheses before starting new work
-9. Report a one-paragraph status summary before starting any testing
+8. bb_check_existing_work({field})     — cross-check with field scope
+9. Determine field discriminator       — web, mobile, binary, or source_code
+10. Report a one-paragraph status summary before starting any testing
 ```
 
 **`bb_get_program_brief` replaces separate calls to `bb_list_findings(q=…)`,

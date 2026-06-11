@@ -283,8 +283,8 @@ header automatically — no extra setup needed.
 
 | Tool | When to use |
 |------|-------------|
-| `bb_create_finding` | Vulnerability mature enough for a main record |
-| `bb_list_findings` | Search or review existing findings |
+| `bb_create_finding` | Vulnerability mature enough — set `field` (web/mobile/binary/source_code) |
+| `bb_list_findings` | Search or review findings — filter by `field` |
 | `bb_get_finding` | Full details of one finding |
 | `bb_update_finding` | Add PoC, description, CWE, or any field |
 | `bb_update_status` | Advance status through workflow |
@@ -340,7 +340,7 @@ header automatically — no extra setup needed.
 
 | Tool | When to use |
 |------|-------------|
-| `bb_get_stats` | Dashboard summary — totals by severity/status/agent |
+| `bb_get_stats` | Dashboard summary — totals by severity/status/agent/field |
 | `bb_notify` | Send alert to Discord/Telegram webhooks |
 | `bb_add_note` | Log progress or dead ends without overwriting fields |
 | `bb_delete_note` | Delete a note from a finding |
@@ -365,6 +365,64 @@ Full tool reference: `<skill-base-path>/references/tools-list.md`
 
 **Always call `bb_list_programs()` before `bb_create_program()`.**
 Never create duplicate programs.
+
+---
+
+## Field Discriminator System
+
+The **field** property categorizes findings by hunting domain. This enables filtered stats,
+targeted methodology loading, and cross-domain similarity scoring.
+
+| Field | Domain | Methodology Reference |
+|-------|--------|----------------------|
+| `web` | Web application testing (standard bug bounty) | `bb-eligible-vulnerabilities.md`, `bb-recon.md` |
+| `mobile` | Mobile app testing (APK/IPA analysis, runtime) | Mobile static analysis tools |
+| `binary` | Binary analysis / reverse engineering | Binary analysis methodology |
+| `source_code` | Source code audit / SAST (white-box review) | Code review patterns |
+
+**Set `field` on every finding** — pass it to `bb_create_finding()`:
+
+```json
+bb_create_finding({
+  "title": "IDOR on /api/user/profile",
+  "target": "app.example.com",
+  "severity": "high",
+  "field": "web",
+  "program_id": 1,
+  "agent": "opencode"
+})
+```
+
+### Evidence Types by Field
+
+Each field introduces domain-specific evidence types for `bb_attach_http_pair()`:
+
+| Evidence Type | Field | Description |
+|--------------|-------|-------------|
+| `binary_analysis_output` | binary | Raw output from Ghidra, IDA, objdump |
+| `binary_ioc` | binary | Indicators of compromise extracted from binaries |
+| `mobile_static_analysis` | mobile | JADX, MobSF, or similar static analysis results |
+| `source_code_vulnerability` | source_code | Vulnerable code pattern from source review |
+
+### Stats Breakdown
+
+`bb_get_stats()` now returns `by_field` — counts per field value. Use this to track
+which domains produce the best results.
+
+### Asset Kinds
+
+When registering assets with `bb_add_asset()`, use these `kind` values:
+
+| Kind | Description |
+|------|-------------|
+| `domain` | Root domain |
+| `subdomain` | Subdomain |
+| `api_host` | API server |
+| `mobile_app` | Android/iOS app |
+| `repo` | Generic repository |
+| `binary` | Binary file (ELF, PE, Mach-O) |
+| `source_repo` | Source code repository |
+| `other` | Other |
 
 ---
 
@@ -625,18 +683,19 @@ bb_attach_http_pair({
 })
 ```
 
-**Minimal finding:**
+**Minimal finding (with field):**
 ```json
 bb_create_finding({
   "title": "IDOR on /api/user/profile — access to other users' PII",
   "target": "app.example.com",
   "severity": "high",
   "program_id": 1,
+  "field": "web",
   "agent": "opencode"
 })
 ```
 
-**Full confirmed finding:**
+**Full confirmed finding (web):**
 ```json
 bb_create_finding({
   "title": "Reflected XSS in search parameter",
@@ -645,11 +704,28 @@ bb_create_finding({
   "severity": "high",
   "status": "confirmed",
   "program_id": 1,
+  "field": "web",
   "agent": "opencode",
   "cwe": "CWE-79",
   "cvss": 7.2,
   "description": "The `q` parameter on `/search` reflects unsanitized input into the DOM.",
   "poc": "## Steps\n1. Navigate to `/search?q=<script>alert(document.cookie)</script>`\n2. Observe script executes.\n\n## Payload\n```\n<script>alert(document.cookie)</script>\n```"
+})
+```
+
+**Binary analysis finding:**
+```json
+bb_create_finding({
+  "title": "Hardcoded RC4 key in binary authentication routine",
+  "target": "malware-sample.exe",
+  "severity": "critical",
+  "program_id": 1,
+  "field": "binary",
+  "agent": "opencode",
+  "cwe": "CWE-321",
+  "cvss": 7.5,
+  "description": "Static analysis of the binary revealed a hardcoded RC4 symmetric key at offset 0x4A20 used for C2 traffic encryption.",
+  "poc": "## Evidence\n- Ghidra analysis at offset 0x4A20 shows `rc4_key = [0xDE, 0xAD, 0xBE, 0xEF, ...]`\n- IDA Pro confirms the key is referenced by the decrypt routine at 0x48F0\n- Attached: binary_analysis_output evidence record"
 })
 ```
 
@@ -661,10 +737,10 @@ Load **only what you need** for the current task:
 
 | File | When to load |
 |------|-------------|
-| `references/bb-orchestrator.md` | Start of every session — routing logic, evidence rules |
+| `references/bb-orchestrator.md` | Start of every session — routing logic, field-aware routing, evidence rules |
 | `references/bb-standards.md` | Scope questions, platform rules, evidence standards |
-| `references/bb-eligible-vulnerabilities.md` | "Is this a valid bug?", CWE lookup, severity triage |
-| `references/bb-operator.md` | Hunting methodology, session structure, patterns |
+| `references/bb-eligible-vulnerabilities.md` | "Is this a valid bug?", CWE lookup, severity triage — filter by field |
+| `references/bb-operator.md` | Hunting methodology, session structure, field-specific patterns |
 | `references/bb-recon.md` | Recon phase — subdomain enum, fingerprinting, JS analysis |
 | `references/bb-report-templates.md` | Writing reports — templates for XSS, IDOR, SSRF, SQLi |
 | `references/im-scheduled.md` | Scheduled/automated missions only |

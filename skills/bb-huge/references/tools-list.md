@@ -2,14 +2,14 @@
 
 ### Findings Management
 
-* `bb_create_finding` — Create a new bug bounty finding
-* `bb_list_findings` — List findings with filters/search
-* `bb_get_finding` — Retrieve full finding details
-* `bb_update_finding` — Update finding fields
+* `bb_create_finding` — Create a new bug bounty finding. Parameters: `field` (web|mobile|binary|source_code), `program_id`, `title`, `target`, `severity`, `status`, `agent`, `cwe`, `cvss`, `description`, `poc`
+* `bb_list_findings` — List findings with filters/search. Filters: `q`, `severity`, `status`, `field`, `agent`, `limit`, `offset`
+* `bb_get_finding` — Retrieve full finding details. Response includes `field`
+* `bb_update_finding` — Update finding fields. Accepts `field`
 * `bb_update_status` — Quickly change finding status
 * `bb_delete_finding` — Delete a finding
-* `bb_get_stats` — Retrieve statistics and summaries
-* `bb_search_similar` — Search for similar findings
+* `bb_get_stats` — Retrieve statistics by severity, status, agent, and field (`by_field` breakdown)
+* `bb_search_similar` — Search for similar findings. `field` parameter adds +15 similarity weight
 * `bb_generate_report_context` — Generate report-ready context pack
 
 ### Notes & Collaboration
@@ -26,10 +26,10 @@
 
 ### Program Management
 
-* `bb_create_program` — Create a bug bounty program
-* `bb_update_program` — Update an existing program's fields
+* `bb_create_program` — Create a bug bounty program. Parameters: `summary` (text), `tech_stack` (JSON array of strings)
+* `bb_update_program` — Update an existing program's fields. Accepts `summary`, `tech_stack`
 * `bb_delete_program` — Delete a program and all associated records
-* `bb_list_programs` — List programs and metadata
+* `bb_list_programs` — List programs and metadata (includes `summary`, `tech_stack`)
 * `bb_get_program_brief` — Retrieve compact hunt briefing/context
 
 ### Recon & Intelligence
@@ -37,7 +37,7 @@
 * `bb_add_recon` — Store recon artifacts (subdomains/endpoints/etc.)
 * `bb_delete_recon` — Delete a recon entry
 * `bb_list_assets` — List program assets
-* `bb_add_asset` — Add an asset to a program
+* `bb_add_asset` — Add an asset to a program. `kind`: domain, subdomain, api_host, mobile_app, repo, binary, source_repo, other
 * `bb_update_asset` — Update asset metadata
 * `bb_delete_asset` — Delete an asset
 
@@ -63,7 +63,7 @@
 * `bb_delete_hypothesis` — Delete a hypothesis
 * `bb_promote_observation` — Convert observation → hypothesis
 * `bb_promote_hypothesis` — Convert hypothesis → finding
-* `bb_check_existing_work` — Check for duplicate/redundant work
+* `bb_check_existing_work` — Check for duplicate/redundant work. Parameters: `program_id`, `target`, `title`, `cwe`, `field`, `description`
 
 ## Workflow Philosophy
 
@@ -81,7 +81,10 @@ This enables agents and humans to:
 
 ## Evidence Model
 
-The server supports structured HTTP evidence storage:
+The server supports structured evidence storage including:
+
+### HTTP Evidence (web, mobile)
+```
 
 * request method
 * URL
@@ -95,6 +98,15 @@ The server supports structured HTTP evidence storage:
 * source tooling
 
 This enables replayable investigations and richer report generation.
+
+### Domain-Specific Evidence Types
+
+| Evidence Type | Field | What It Captures |
+|--------------|-------|-----------------|
+| `binary_analysis_output` | binary | Raw output from Ghidra, IDA Pro, objdump, strings |
+| `binary_ioc` | binary | IOCs extracted from binaries (hashes, IPs, domains, offsets) |
+| `mobile_static_analysis` | mobile | JADX/MobSF analysis, Android manifest review, iOS plist |
+| `source_code_vulnerability` | source_code | Vulnerable code patterns, SAST findings, manual review snippets |
 
 ## Supported Agent Types
 

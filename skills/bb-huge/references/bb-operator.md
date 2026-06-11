@@ -8,6 +8,25 @@ how to pick targets, structure a session, and maximize finding rate.
 
 ---
 
+## Field-Aware Target Selection
+
+Before selecting targets, determine the **field discriminator** for the current engagement.
+The field affects which targets are high-value and which methodology to use.
+
+### Field Selection Guide
+
+| Field | Best Targets | Starting Methodology |
+|-------|-------------|---------------------|
+| `web` | Web apps, APIs, GraphQL, SPAs | Recon → vuln testing |
+| `mobile` | Android APK, iOS IPA, mobile APIs | Static analysis → runtime testing |
+| `binary` | ELF/PE/Mach-O, firmware, malware samples | Strings → disassembly → dynamic analysis |
+| `source_code` | GitHub repos, private source, npm packages | SAST → dep scanning → manual review |
+
+When logging findings, always set `field` to match the current domain.
+Filter stats with `bb_get_stats()` to see which field produces the best results.
+
+---
+
 ## Target Selection Strategy
 
 ### High-value target indicators:
@@ -30,16 +49,16 @@ how to pick targets, structure a session, and maximize finding rate.
 ### Phase 1 — Reconnaissance (load `bb-recon.md`)
 ```
 Goal: Build a complete map of the attack surface before testing anything.
+Field-aware adjustments:
 
-1. Subdomain enumeration
-2. Port/service scanning (if in scope)
-3. Technology fingerprinting
-4. JavaScript endpoint extraction
-5. Parameter discovery
-6. Authentication surface mapping (login, register, forgot password, OAuth, SSO)
+  web:    Subdomain enumeration → fingerprinting → JS analysis
+  mobile: APK/IPA acquisition → decompile → manifest review
+  binary: File identification → strings/imports → disassembly
+ source_code: Clone repo → dependency analysis → SAST scanning
 ```
+
 **Output**: A recon finding in bb-huge with `status: debugging`, all discovered
-assets noted in description.
+assets noted in description. Set `field` on the finding.
 
 ### Phase 2 — Vulnerability Hunting (load `bb-eligible-vulnerabilities.md`)
 ```
@@ -149,6 +168,34 @@ Signal:  Executes in another session (use two accounts)
 - No finding after 2 hours on a specific surface → move to next surface
 - Stuck on a finding for 1 hour → note current state in bb-huge, come back later
 - Found one critical → document it fully before continuing
+
+---
+
+## Field-Specific Evidence Preservation
+
+Each field generates different types of evidence. Use the right evidence type when
+calling `bb_attach_http_pair()`:
+
+| Field | Primary Evidence | Tooling |
+|-------|-----------------|---------|
+| `web` | HTTP request/response pairs (`bb_attach_http_pair`) | Burp, nuclei, curl |
+| `mobile` | Static analysis output (`mobile_static_analysis`) | JADX, MobSF, Frida |
+| `binary` | Analysis output + IOCs (`binary_analysis_output`, `binary_ioc`) | Ghidra, IDA, strings |
+| `source_code` | Vulnerable code snippets (`source_code_vulnerability`) | semgrep, codeql, grep |
+
+**Binary evidence example:**
+```json
+bb_attach_http_pair({
+  "program_id": 1,
+  "finding_id": 5,
+  "title": "Ghidra: RC4 key at offset 0x4A20",
+  "summary": "Hardcoded RC4 symmetric key found in binary auth routine",
+  "request_method": "internal",
+  "request_url": "binary://malware-sample.exe/offset/0x4A20",
+  "response_status": 200,
+  "response_body_text": "Disassembly of decrypt routine confirms key usage at 0x48F0"
+})
+```
 
 ---
 
