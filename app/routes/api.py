@@ -13,6 +13,7 @@ from ..models import (
     CONFIDENCE_LEVELS,
     ENDPOINT_PROTOCOLS,
     EVIDENCE_TYPES,
+    FIELDS,
     HYPOTHESIS_STATUSES,
     OBSERVATION_CATEGORIES,
     OBSERVATION_STATUSES,
@@ -300,6 +301,12 @@ def _similarity_score(candidate, query):
         score += 35
         reasons.append("same cwe")
 
+    query_field = (query.get("field") or "").strip().lower()
+    candidate_field = (candidate.get("field") or "").strip().lower()
+    if query_field and candidate_field and query_field == candidate_field:
+        score += 15
+        reasons.append("same field")
+
     query_target = (query.get("target") or "").strip().lower()
     candidate_target = (candidate.get("target") or candidate.get("program_name") or "").strip().lower()
     if query_target and candidate_target:
@@ -352,12 +359,21 @@ def get_stats():
     sev = {s: Finding.query.filter_by(severity=s).count() for s in SEVERITIES}
     sta = {s: Finding.query.filter_by(status=s).count() for s in STATUSES}
     agt = {a: Finding.query.filter_by(agent=a).count() for a in AGENTS}
+    by_field = {
+        f: {
+            "total": Finding.query.filter_by(field=f).count(),
+            "by_severity": {s: Finding.query.filter_by(field=f, severity=s).count() for s in SEVERITIES},
+            "by_status": {s: Finding.query.filter_by(field=f, status=s).count() for s in STATUSES},
+        }
+        for f in FIELDS
+    }
     return jsonify(
         {
             "total": Finding.query.count(),
             "by_severity": sev,
             "by_status": sta,
             "by_agent": agt,
+            "by_field": by_field,
         }
     )
 
@@ -369,6 +385,7 @@ def list_findings():
     severity = request.args.get("severity", "")
     status = request.args.get("status", "")
     agent = request.args.get("agent", "")
+    field = request.args.get("field", "")
     limit = _limit_arg()
     offset = int(request.args.get("offset", 0))
 
@@ -388,6 +405,8 @@ def list_findings():
         query = query.filter_by(status=status)
     if agent:
         query = query.filter_by(agent=agent)
+    if field:
+        query = query.filter_by(field=field)
 
     total = query.count()
     findings = (
@@ -440,6 +459,11 @@ def create_finding():
     if err:
         return err
 
+    field = data.get("field", "web")
+    err = _validate_from_data(field, "field", FIELDS)
+    if err:
+        return err
+
     hypothesis_id = data.get("hypothesis_id")
     if hypothesis_id:
         Hypothesis.query.get_or_404(hypothesis_id)
@@ -448,6 +472,7 @@ def create_finding():
         title=data["title"].strip(),
         target=data["target"].strip(),
         platform=data.get("platform", "private"),
+        field=field,
         severity=severity,
         status=status,
         agent=data.get("agent", "manual"),
@@ -470,7 +495,7 @@ def update_finding(fid):
     data = request.get_json(force=True) or {}
 
     _apply_fields(finding, data, [
-        "title", "target", "platform", "agent", "cwe",
+        "title", "target", "platform", "field", "agent", "cwe",
         "description", "poc", "program_id",
     ])
 
@@ -584,6 +609,7 @@ def get_enums():
             "asset_kinds": ASSET_KINDS,
             "asset_environments": ASSET_ENVIRONMENTS,
             "endpoint_protocols": ENDPOINT_PROTOCOLS,
+            "fields": FIELDS,
         }
     )
 
@@ -591,7 +617,11 @@ def get_enums():
 @api_bp.get("/programs")
 @api_key_required
 def list_programs():
-    programs = Program.query.order_by(Program.active.desc(), Program.name).all()
+    field = request.args.get("field", "")
+    query = Program.query
+    if field:
+        query = query.filter_by(field=field)
+    programs = query.order_by(Program.active.desc(), Program.name).all()
     return jsonify([program.to_dict() for program in programs])
 
 
@@ -616,6 +646,10 @@ def create_program():
         scope_in=data.get("scope_in", ""),
         scope_out=data.get("scope_out", ""),
         notes=data.get("notes", ""),
+        field=data.get("field", "web"),
+        summary=data.get("summary", ""),
+        auto_brief=data.get("auto_brief", ""),
+        tech_stack=data.get("tech_stack", ""),
         active=data.get("active", True),
     )
     _save(program)
@@ -628,7 +662,8 @@ def update_program(pid):
     program = Program.query.get_or_404(pid)
     data = request.get_json(force=True) or {}
     _apply_fields(program, data, [
-        "name", "platform", "program_url", "scope_in", "scope_out", "notes",
+        "name", "platform", "program_url", "scope_in", "scope_out",
+        "field", "summary", "auto_brief", "tech_stack", "notes",
     ])
     if "logo_url" in data:
         program.logo_url = data.get("logo_url")
@@ -726,6 +761,10 @@ def get_program_brief(pid):
                     Hypothesis.status.in_(["open", "testing", "confirmed"]),
                 ).count(),
                 "evidence_records": EvidenceRecord.query.filter_by(program_id=pid).count(),
+                "by_field": {
+                    f: Finding.query.filter_by(program_id=pid, field=f).count()
+                    for f in FIELDS
+                },
             },
             "recent_findings": [_finding_summary(finding) for finding in recent_findings],
             "recent_recon": [entry.to_dict() for entry in recent_recon],
@@ -1066,6 +1105,7 @@ def promote_hypothesis(hid):
         title=title,
         target=(data.get("target") or _derive_target_from_hypothesis(hypothesis)).strip(),
         platform=data.get("platform", hypothesis.program.platform),
+        field=data.get("field", "web"),
         severity=severity,
         status=status,
         agent=data.get("agent", hypothesis.agent),
@@ -1372,6 +1412,7 @@ def similarity_check():
         "target": data.get("target") or data.get("asset_identifier"),
         "title": data.get("title"),
         "cwe": data.get("cwe"),
+        "field": data.get("field", ""),
         "description": data.get("description"),
     }
 
@@ -1379,6 +1420,7 @@ def similarity_check():
         return jsonify({"error": "provide target, title, cwe, or description"}), 400
 
     program_id = query["program_id"]
+    field = query["field"]
 
     finding_query = Finding.query
     observation_query = Observation.query
@@ -1387,6 +1429,8 @@ def similarity_check():
         finding_query = finding_query.filter_by(program_id=program_id)
         observation_query = observation_query.filter_by(program_id=program_id)
         hypothesis_query = hypothesis_query.filter_by(program_id=program_id)
+    if field:
+        finding_query = finding_query.filter_by(field=field)
 
     def _score(item_dict, summary, kind="finding"):
         score, reasons = _similarity_score(item_dict, query)
@@ -1403,7 +1447,7 @@ def similarity_check():
     for finding in finding_query.order_by(Finding.updated_at.desc()).limit(150).all():
         result = _score(
             {"id": finding.id, "title": finding.title, "target": finding.target,
-             "cwe": finding.cwe, "description": finding.description},
+             "cwe": finding.cwe, "field": finding.field, "description": finding.description},
             _finding_summary(finding),
             kind="finding",
         )
