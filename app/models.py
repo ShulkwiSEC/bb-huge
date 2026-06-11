@@ -62,11 +62,15 @@ ASSET_KINDS = [
     "subdomain",
     "api_host",
     "mobile_app",
+    "binary",
+    "source_repo",
     "repo",
     "other",
 ]
 
 ASSET_ENVIRONMENTS = ["prod", "staging", "dev", "test", "unknown"]
+
+FIELDS = ["binary", "mobile", "source_code", "web"]
 
 ENDPOINT_PROTOCOLS = ["http", "https", "graphql", "ws", "wss", "other"]
 
@@ -103,7 +107,11 @@ EVIDENCE_TYPES = [
     "repro_step",
     "environment",
     "credential_context",
+    "binary_analysis_output",
+    "binary_ioc",
+    "mobile_static_analysis",
     "other",
+    "source_code_vulnerability",
 ]
 
 SEVERITY_COLORS = {
@@ -154,9 +162,25 @@ class Program(db.Model):
     scope_in = db.Column(db.Text, nullable=False, default="")
     scope_out = db.Column(db.Text, nullable=False, default="")
     notes = db.Column(db.Text, nullable=False, default="")
+    field = db.Column(db.String(20), nullable=False, default="web")
+    summary = db.Column(db.Text, nullable=False, default="")
+    auto_brief = db.Column(db.Text, nullable=False, default="")
+    _tech_stack = db.Column("tech_stack", db.Text, nullable=False, default="[]")
     active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
+
+    @property
+    def tech_stack(self):
+        return _load_json(self._tech_stack, [])
+
+    @tech_stack.setter
+    def tech_stack(self, value):
+        if value is None:
+            value = []
+        elif isinstance(value, str):
+            value = [item.strip() for item in value.split(",") if item.strip()]
+        self._tech_stack = _dump_json(value, [])
 
     findings = db.relationship("Finding", backref="program", lazy=True)
     recon = db.relationship(
@@ -190,6 +214,10 @@ class Program(db.Model):
             "scope_in": self.scope_in,
             "scope_out": self.scope_out,
             "notes": self.notes,
+            "field": self.field,
+            "summary": self.summary,
+            "auto_brief": self.auto_brief,
+            "tech_stack": self.tech_stack,
             "active": self.active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "stats": self.stats(),
@@ -408,6 +436,7 @@ class Finding(db.Model):
     title = db.Column(db.String(300), nullable=False)
     target = db.Column(db.String(300), nullable=False)
     platform = db.Column(db.String(100), nullable=False, default="private")
+    field = db.Column(db.String(20), nullable=False, default="web")
     severity = db.Column(db.String(20), nullable=False, default="medium")
     status = db.Column(db.String(20), nullable=False, default="discovered")
     agent = db.Column(db.String(50), nullable=False, default="manual")
@@ -459,6 +488,7 @@ class Finding(db.Model):
             "title": self.title,
             "target": self.target,
             "platform": self.platform,
+            "field": self.field,
             "severity": self.severity,
             "status": self.status,
             "agent": self.agent,
