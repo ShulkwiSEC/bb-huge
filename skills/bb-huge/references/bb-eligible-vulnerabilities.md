@@ -182,6 +182,50 @@ with CWE mappings, typical severity, impact description, and quick triage notes.
 
 ---
 
+## 📱 Mobile Vulnerabilities
+
+### Insecure Data Storage — CWE-312
+- **Severity**: Medium–High
+- **Targets**: `shared_prefs`, `databases`, `plist`, external storage.
+
+### Unvalidated Deep Link — CWE-939
+- **Severity**: Medium–High
+- **Impact**: Triggering sensitive actions or RCE in WebView.
+
+### Exported Android Components — CWE-926
+- **Severity**: Medium–High
+- **Impact**: Unauthorized access to app features by other apps.
+
+---
+
+## ⚙️ Binary Vulnerabilities
+
+### Buffer Overflow — CWE-120
+- **Severity**: Critical (RCE) → High (DoS)
+- **Triage**: Control over instruction pointer (EIP/RIP).
+
+### Use-After-Free — CWE-416
+- **Severity**: Critical–High
+- **Impact**: Memory corruption leading to code execution.
+
+### Hardcoded Constants — CWE-321
+- **Severity**: High–Critical
+- **Targets**: Hardcoded crypto keys, C2 IPs, or admin credentials.
+
+---
+
+## 📄 Source Code / SAST Findings
+
+### Reachable Vulnerabilities
+- **SQLi/RCE in Code**: MUST be reachable via a public interface.
+- **Severity**: Same as web equivalents.
+
+### Hardcoded Secrets in Repo — CWE-798
+- **Severity**: High–Critical
+- **Targets**: AWS keys, DB credentials, SSH private keys.
+
+---
+
 ## What Programs Usually DON'T Accept
 
 | Issue | Reason |

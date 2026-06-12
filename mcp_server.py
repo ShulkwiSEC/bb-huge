@@ -156,6 +156,12 @@ TOOLS = [
                     "type": "string",
                     "description": "Markdown proof of concept and steps to reproduce",
                 },
+                "field": {
+                    "type": "string",
+                    "enum": ["web", "mobile", "binary", "source_code"],
+                    "default": "web",
+                    "description": "Field of the finding (web, mobile, binary, source_code)",
+                },
             },
         },
     },
@@ -185,6 +191,11 @@ TOOLS = [
                     ],
                 },
                 "agent": {"type": "string", "description": "Filter by agent"},
+                "field": {
+                    "type": "string",
+                    "enum": ["web", "mobile", "binary", "source_code", ""],
+                    "description": "Filter by field",
+                },
                 "limit": {"type": "integer", "default": 20},
                 "offset": {"type": "integer", "default": 0},
             },
@@ -234,6 +245,11 @@ TOOLS = [
                 "cvss": {"type": "number"},
                 "description": {"type": "string"},
                 "poc": {"type": "string"},
+                "field": {
+                    "type": "string",
+                    "enum": ["web", "mobile", "binary", "source_code"],
+                    "description": "Field of the finding (web, mobile, binary, source_code)",
+                },
             },
         },
     },
@@ -274,8 +290,17 @@ TOOLS = [
     },
     {
         "name": "bb_get_stats",
-        "description": "Get overall statistics: totals by severity, status, and agent.",
-        "inputSchema": {"type": "object", "properties": {}},
+        "description": "Get overall statistics: totals by severity, status, agent, and field.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "type": "string",
+                    "enum": ["binary", "mobile", "source_code", "web"],
+                    "description": "Filter stats by field",
+                }
+            },
+        },
     },
     {
         "name": "bb_upload_attachment",
@@ -309,6 +334,11 @@ TOOLS = [
                 "title": {
                     "type": "string",
                     "description": "Keywords from the finding title",
+                },
+                "field": {
+                    "type": "string",
+                    "enum": ["web", "mobile", "binary", "source_code", ""],
+                    "description": "Filter by field",
                 },
             },
         },
@@ -410,6 +440,19 @@ TOOLS = [
                 "notes": {
                     "type": "string",
                     "description": "General notes about this program",
+                },
+                "field": {
+                    "type": "string",
+                    "enum": ["web", "mobile", "binary", "source_code"],
+                    "description": "Program category",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Short summary of the program",
+                },
+                "tech_stack": {
+                    "type": "string",
+                    "description": "JSON array of tech stack items e.g. [\"Python\",\"Flask\"]",
                 },
             },
         },
@@ -617,6 +660,11 @@ TOOLS = [
                 "title": {"type": "string"},
                 "cwe": {"type": "string"},
                 "description": {"type": "string"},
+                "field": {
+                    "type": "string",
+                    "enum": ["web", "mobile", "binary", "source_code", ""],
+                    "description": "Filter by field",
+                },
             },
         },
     },
@@ -861,6 +909,16 @@ TOOLS = [
                 "scope_out": {"type": "string"},
                 "notes": {"type": "string"},
                 "active": {"type": "boolean"},
+                "field": {
+                    "type": "string",
+                    "enum": ["web", "mobile", "binary", "source_code"],
+                    "description": "Program category",
+                },
+                "summary": {"type": "string", "description": "Short summary of the program"},
+                "tech_stack": {
+                    "type": "string",
+                    "description": "JSON array of tech stack items e.g. [\"Python\",\"Flask\"]",
+                },
             },
         },
     },
@@ -1053,7 +1111,8 @@ def dispatch(name: str, args: dict) -> Any:
         return api_delete(f"/findings/{args['id']}")
 
     elif name == "bb_get_stats":
-        return api_get("/stats")
+        qs = _qs(args)
+        return api_get(f"/stats{'?' + qs if qs else ''}")
 
     elif name == "bb_upload_attachment":
         import base64

@@ -7,7 +7,8 @@ description: >
   "update finding", "show findings", "bb-huge stats", "mark as confirmed",
   "mark as rewarded", "setup workspace", "pull evidence", "continue working on
   finding", "dump attachments", "list my skills", "what skills do I have",
-  "/bb-huge init", "init hunt workspace", "new bug bounty program", "start hunting".
+  "/bb-huge init", "init hunt workspace", "new bug bounty program", "start hunting",
+  "mobile bug bounty", "binary analysis", "source code review", "white-box audit".
   Also auto-activates whenever a vulnerability is discovered during any recon,
   fuzzing, or manual testing session — do not wait to be asked.
 ---
@@ -25,6 +26,26 @@ You are a disciplined bug bounty hunting agent with three jobs:
 
 Never wait for a "finished" exploit before logging. A thin entry now is better
 than a perfect entry that never gets written.
+
+---
+
+## 🧭 FIELD DISPATCH — 4 Hunting Domains
+
+bb-huge supports 4 specialized fields. Before starting any task, determine the
+correct field. This controls which methodologies you load and how evidence is
+collected.
+
+| Field | Description | Primary Targets |
+|---|---|---|
+| `web` | Standard web bug bounty | Domains, APIs, SaaS portals |
+| `mobile` | Mobile application security | APK (Android), IPA (iOS) |
+| `binary` | Reverse engineering | `.exe`, `.dll`, `.so`, ELF binaries |
+| `source_code` | White-box audit / SAST | Git repos, local source code |
+
+**Protocol:**
+1. Check `program.field` via `bb_get_program_brief()`.
+2. Load field-specific methodology (e.g., `mobile-methodology.md`).
+3. Set `field` on every finding/observation/hypothesis.
 
 ---
 
@@ -496,10 +517,29 @@ If activated via automated schedule or cron job:
 1. `bb_list_programs()` — check if target already has a program entry.
 2. If not found: `bb_create_program({name, platform})` — create it.
 3. `bb_get_program_brief(program_id)` — pull compact briefing.
-4. `bb_get_context(program_id)` — check if SOP-5 Q&A already done.
+4. **Determine Field Setup**:
+   - **Web**: existing flow (DNS recon → subdomains → spidering).
+   - **Mobile**: Download APK/IPA → decompile (JADX) → set up proxy/Frida.
+   - **Binary**: Load binary in Ghidra/IDA → strings analysis → initial triage.
+   - **Source Code**: Clone repo → run SAST scanners (Semgrep/Snyk) → dependency check.
+5. `bb_get_context(program_id)` — check if SOP-5 Q&A already done.
    If empty → run SOP-5 before continuing.
-5. If prior work exists: read recent findings + open observations/hypotheses.
-6. Report a one-paragraph status summary before starting any testing.
+6. If prior work exists: read recent findings + open observations/hypotheses.
+7. **Auto-Summarize**: run **Program Auto-Summarization Protocol** (see below).
+8. Report a one-paragraph status summary before starting any testing.
+
+---
+
+### 📋 Program Auto-Summarization Protocol
+
+When first starting a program, the agent MUST auto-populate the program's
+summary and tech stack to help future sessions.
+
+1. **Web**: Check `Wappalyzer`, headers, `robots.txt`, and homepage content.
+2. **Mobile**: Identify platform (Android/iOS), SDKs, and main frameworks.
+3. **Binary**: identify architecture (x64/ARM), compiler, and packing (UPX).
+4. **Source Code**: Identify primary languages and package manager.
+5. **Update**: Use `bb_update_program({ program_id, summary, tech_stack })`.
 
 ---
 
@@ -515,7 +555,11 @@ If activated via automated schedule or cron job:
    | Medium — looks real, testing | `bb_log_hypothesis()` |
    | High — confirmed, reproducible | `bb_create_finding()` |
 
-4. `bb_attach_http_pair()` or `bb_upload_attachment()` — preserve evidence immediately.
+4. **Attach Evidence Immediately**:
+   - **Web**: `bb_attach_http_pair` (request/response) or screenshot.
+   - **Mobile**: Frida hook logs, decompile snippet, or screenshot of app.
+   - **Binary**: disassembly dump, hex dump, or debugger stack trace.
+   - **Source Code**: code snippet with file:line reference.
 5. Continue enriching; promote when confidence grows.
 6. `bb_update_status() → confirmed` only when reproducible 3 times in a row.
 
@@ -584,6 +628,24 @@ If activated via automated schedule or cron job:
   - Mobile app in scope? (APK/IPA available?)
   - WAF, rate limiting, or protections expected?
 
+📱 MOBILE SPECIFIC
+  - Is the APK/IPA obfuscated?
+  - Root detection or Jailbreak protection active?
+  - SSL pinning implemented?
+  - Minimum supported API level?
+
+⚙️ BINARY SPECIFIC
+  - Target architecture? (x86, x64, ARM)
+  - Is the binary packed or stripped?
+  - Protected by ASLR, DEP, or Stack Canaries?
+  - Remote service or local application?
+
+📄 SOURCE CODE SPECIFIC
+  - Primary languages and frameworks?
+  - CI/CD pipeline accessible?
+  - Any internal dependency management?
+  - Are SAST tool results already available?
+
 🎯 PRIORITIES & FOCUS
   - Bug types to focus on? (IDOR, SSRF, XSS, logic flaws)
   - Specific feature/endpoint that looks suspicious?
@@ -620,8 +682,12 @@ Never ask these questions again — always `bb_get_context` first.
 
 1. `bb_generate_report_context(finding_id)` — full report pack.
 2. Fill unresolved gaps (CWE, CVSS, PoC, evidence).
-3. Load `<skill-base-path>/references/bb-report-templates.md` for the matching vuln type.
-4. Write the report using the template.
+3. **Route by Field**:
+   - **Web**: Load `references/bb-report-templates.md`.
+   - **Mobile**: Load `references/mobile-report-templates.md`.
+   - **Binary**: Load `references/binary-report-templates.md`.
+   - **Source Code**: Load `references/source-code-report-templates.md`.
+4. Write the report using the matching template for the vuln type.
 5. Submit to platform.
 6. `bb_update_status() → reported`.
 

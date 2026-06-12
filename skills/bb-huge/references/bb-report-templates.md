@@ -8,6 +8,19 @@ Copy, fill in the blanks, and submit.
 
 ---
 
+## 🧭 FIELD ROUTING INDEX
+
+When writing a report, select the template collection matching the hunting field:
+
+| Field | Template Reference |
+|---|---|
+| `web` | `bb-report-templates.md` (this file) |
+| `mobile` | `mobile-report-templates.md` |
+| `binary` | `binary-report-templates.md` |
+| `source_code` | `source-code-report-templates.md` |
+
+---
+
 Programs in the report pack include metadata such as `name`, `program_url`, and `logo_url`. Templates can reference `program.logo_url` to place a logo in report headers. Example snippet from a report pack:
 
 ```json

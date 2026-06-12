@@ -25,6 +25,7 @@ from ..models import (
     SEVERITIES,
     STATUSES,
     AGENTS,
+    FIELDS,
 )
 from .auth import login_required
 from ..utils import allowed_file
@@ -48,6 +49,9 @@ def dashboard():
     sev_counts = {s: Finding.query.filter_by(severity=s).count() for s in SEVERITIES}
     sta_counts = {s: Finding.query.filter_by(status=s).count() for s in STATUSES}
 
+    # Field breakdown
+    field_counts = {f: Finding.query.filter_by(field=f).count() for f in FIELDS}
+
     # Agent breakdown
     agent_counts = {a: Finding.query.filter_by(agent=a).count() for a in AGENTS}
 
@@ -64,6 +68,7 @@ def dashboard():
         confirmed=confirmed,
         sev_counts=sev_counts,
         sta_counts=sta_counts,
+        field_counts=field_counts,
         agent_counts=agent_counts,
         recent=recent,
         programs=programs,
@@ -80,6 +85,7 @@ def list_findings():
     severity = request.args.get("severity", "")
     status = request.args.get("status", "")
     agent = request.args.get("agent", "")
+    field = request.args.get("field", "")
     platform = request.args.get("platform", "")
     program_id = request.args.get("program_id", type=int) or ""
     sort = request.args.get("sort", "newest")
@@ -102,6 +108,8 @@ def list_findings():
         query = query.filter_by(status=status)
     if agent:
         query = query.filter_by(agent=agent)
+    if field:
+        query = query.filter_by(field=field)
     if platform:
         query = query.filter(Finding.platform.ilike(f"%{platform}%"))
     if program_id:
@@ -174,12 +182,14 @@ def list_findings():
         severities=SEVERITIES,
         statuses=STATUSES,
         agents=AGENTS,
+        fields=FIELDS,
         platforms=platforms,
         programs=Program.query.order_by(Program.name).all(),
         q=q,
         severity=severity,
         status=status,
         agent=agent,
+        field=field,
         platform=platform,
         sort=sort,
         program_id=program_id,
@@ -221,6 +231,7 @@ def add_finding():
             severity=request.form["severity"],
             status=request.form.get("status", "discovered"),
             agent=request.form.get("agent", "manual"),
+            field=request.form.get("field", "web"),
             cwe=request.form.get("cwe", "").strip() or None,
             cvss=_parse_float(request.form.get("cvss")),
             description=request.form.get("description", ""),
@@ -247,6 +258,7 @@ def add_finding():
         severities=SEVERITIES,
         statuses=STATUSES,
         agents=AGENTS,
+        fields=FIELDS,
     )
 
 
@@ -361,6 +373,7 @@ def edit_finding(fid):
         finding.severity = request.form["severity"]
         finding.status = request.form.get("status", finding.status)
         finding.agent = request.form.get("agent", finding.agent)
+        finding.field = request.form.get("field", finding.field)
         finding.cwe = request.form.get("cwe", "").strip() or None
         finding.cvss = _parse_float(request.form.get("cvss"))
         finding.description = request.form.get("description", "")
@@ -382,6 +395,7 @@ def edit_finding(fid):
         severities=SEVERITIES,
         statuses=STATUSES,
         agents=AGENTS,
+        fields=FIELDS,
     )
 
 

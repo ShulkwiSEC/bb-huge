@@ -1,0 +1,17 @@
+{
+    "skill_name": "ssrf-aws-metadata-abuse",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the ssrf-aws-metadata-abuse workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

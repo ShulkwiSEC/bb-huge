@@ -356,26 +356,50 @@ def _top_duplicate_hotspots(program_id):
 @api_bp.get("/stats")
 @api_key_required
 def get_stats():
-    sev = {s: Finding.query.filter_by(severity=s).count() for s in SEVERITIES}
-    sta = {s: Finding.query.filter_by(status=s).count() for s in STATUSES}
-    agt = {a: Finding.query.filter_by(agent=a).count() for a in AGENTS}
-    by_field = {
-        f: {
-            "total": Finding.query.filter_by(field=f).count(),
-            "by_severity": {s: Finding.query.filter_by(field=f, severity=s).count() for s in SEVERITIES},
-            "by_status": {s: Finding.query.filter_by(field=f, status=s).count() for s in STATUSES},
+    field_filter = request.args.get("field", "").strip()
+
+    if field_filter:
+        base = Finding.query.filter_by(field=field_filter)
+        sev = {s: base.filter_by(severity=s).count() for s in SEVERITIES}
+        sta = {s: base.filter_by(status=s).count() for s in STATUSES}
+        agt = {a: base.filter_by(agent=a).count() for a in AGENTS}
+        by_field = {
+            field_filter: {
+                "total": base.count(),
+                "by_severity": sev,
+                "by_status": sta,
+            }
         }
-        for f in FIELDS
-    }
-    return jsonify(
-        {
-            "total": Finding.query.count(),
-            "by_severity": sev,
-            "by_status": sta,
-            "by_agent": agt,
-            "by_field": by_field,
+        return jsonify(
+            {
+                "total": base.count(),
+                "by_severity": sev,
+                "by_status": sta,
+                "by_agent": agt,
+                "by_field": by_field,
+            }
+        )
+    else:
+        sev = {s: Finding.query.filter_by(severity=s).count() for s in SEVERITIES}
+        sta = {s: Finding.query.filter_by(status=s).count() for s in STATUSES}
+        agt = {a: Finding.query.filter_by(agent=a).count() for a in AGENTS}
+        by_field = {
+            f: {
+                "total": Finding.query.filter_by(field=f).count(),
+                "by_severity": {s: Finding.query.filter_by(field=f, severity=s).count() for s in SEVERITIES},
+                "by_status": {s: Finding.query.filter_by(field=f, status=s).count() for s in STATUSES},
+            }
+            for f in FIELDS
         }
-    )
+        return jsonify(
+            {
+                "total": Finding.query.count(),
+                "by_severity": sev,
+                "by_status": sta,
+                "by_agent": agt,
+                "by_field": by_field,
+            }
+        )
 
 
 @api_bp.get("/findings")

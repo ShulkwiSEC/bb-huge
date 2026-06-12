@@ -14,6 +14,7 @@ from ..models import (
     RECON_CATEGORIES,
     SEVERITIES,
     STATUSES,
+    FIELDS,
     Asset,
     Endpoint,
     EvidenceRecord,
@@ -129,9 +130,15 @@ def detail(pid):
 @login_required
 def add_program():
     if request.method == "POST":
+        tech_stack_raw = request.form.get("tech_stack", "")
+        tech_stack = [t.strip() for t in tech_stack_raw.split(",") if t.strip()]
+        
         p = Program(
             name        = request.form["name"].strip(),
             platform    = request.form.get("platform", "private"),
+            field       = request.form.get("field", "web"),
+            summary     = request.form.get("summary", ""),
+            tech_stack  = tech_stack,
             program_url = request.form.get("program_url", "").strip() or None,
             logo_url    = request.form.get("logo_url", "").strip() or None,
             scope_in    = request.form.get("scope_in", ""),
@@ -145,7 +152,7 @@ def add_program():
         return redirect(url_for("programs.detail", pid=p.id))
 
     return render_template("programs/form.html",
-                           program=None, platforms=PLATFORMS)
+                           program=None, platforms=PLATFORMS, fields=FIELDS)
 
 
 # ── Edit ──────────────────────────────────────────────────────────────────────
@@ -156,8 +163,14 @@ def edit_program(pid):
     p = Program.query.get_or_404(pid)
 
     if request.method == "POST":
+        tech_stack_raw = request.form.get("tech_stack", "")
+        tech_stack = [t.strip() for t in tech_stack_raw.split(",") if t.strip()]
+
         p.name        = request.form["name"].strip()
         p.platform    = request.form.get("platform", p.platform)
+        p.field       = request.form.get("field", p.field)
+        p.summary     = request.form.get("summary", p.summary)
+        p.tech_stack  = tech_stack
         p.program_url = request.form.get("program_url", "").strip() or None
         p.logo_url    = request.form.get("logo_url", "").strip() or None
         p.scope_in    = request.form.get("scope_in", "")
@@ -170,7 +183,7 @@ def edit_program(pid):
         return redirect(url_for("programs.detail", pid=p.id))
 
     return render_template("programs/form.html",
-                           program=p, platforms=PLATFORMS)
+                           program=p, platforms=PLATFORMS, fields=FIELDS)
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────

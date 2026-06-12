@@ -1,0 +1,17 @@
+{
+    "skill_name": "ai-prompt-leaking",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the ai-prompt-leaking workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

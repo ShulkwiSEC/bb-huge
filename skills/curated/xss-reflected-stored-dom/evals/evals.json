@@ -1,0 +1,17 @@
+{
+    "skill_name": "xss-reflected-stored-dom",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the xss-reflected-stored-dom workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

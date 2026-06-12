@@ -7,6 +7,8 @@ MIGRATION_V2_FIRST_SLICE = "20260520_v2_first_slice"
 MIGRATION_ASSETS_ENDPOINTS = "20260522_assets_endpoints"
 MIGRATION_PROGRAMS_LOGO = "20260529_programs_logo"
 MIGRATION_PROGRAM_SUMMARY = "20260611_program_summary"
+MIGRATION_FIELD_COLUMN = "20260611_field_column"
+MIGRATION_TECH_STACK = "20260612_tech_stack"
 
 
 def run_migrations():
@@ -43,6 +45,8 @@ def _migrations():
         (MIGRATION_ASSETS_ENDPOINTS, _migration_assets_endpoints),
         (MIGRATION_PROGRAMS_LOGO, _migration_programs_logo),
         (MIGRATION_PROGRAM_SUMMARY, _migration_program_summary),
+        (MIGRATION_FIELD_COLUMN, _migration_field_column),
+        (MIGRATION_TECH_STACK, _migration_tech_stack),
     ]
 
 
@@ -143,4 +147,33 @@ def _migration_program_summary(conn):
         columns,
         "auto_brief",
         "ALTER TABLE programs ADD COLUMN auto_brief TEXT NOT NULL DEFAULT ''",
+    )
+
+
+def _migration_field_column(conn):
+    inspector = inspect(conn)
+
+    for table in ("programs", "findings"):
+        if table not in inspector.get_table_names():
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        _add_column_if_missing(
+            conn,
+            columns,
+            "field",
+            f"ALTER TABLE {table} ADD COLUMN field VARCHAR(20) NOT NULL DEFAULT 'web'",
+        )
+
+
+def _migration_tech_stack(conn):
+    inspector = inspect(conn)
+    if "programs" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("programs")}
+    _add_column_if_missing(
+        conn,
+        columns,
+        "tech_stack",
+        "ALTER TABLE programs ADD COLUMN tech_stack TEXT NOT NULL DEFAULT '[]'",
     )

@@ -1,0 +1,17 @@
+{
+    "skill_name": "business-logic-bypass",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the business-logic-bypass workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

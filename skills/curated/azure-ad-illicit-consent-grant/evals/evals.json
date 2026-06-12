@@ -1,0 +1,17 @@
+{
+    "skill_name": "azure-ad-illicit-consent-grant",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the azure-ad-illicit-consent-grant workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

@@ -107,11 +107,16 @@ EVIDENCE_TYPES = [
     "repro_step",
     "environment",
     "credential_context",
+    "mobile_static_analysis",
+    "mobile_dynamic_analysis",
+    "mobile_network_traffic",
     "binary_analysis_output",
     "binary_ioc",
-    "mobile_static_analysis",
-    "other",
+    "binary_exploit",
     "source_code_vulnerability",
+    "source_code_scan",
+    "source_code_review_note",
+    "other",
 ]
 
 SEVERITY_COLORS = {

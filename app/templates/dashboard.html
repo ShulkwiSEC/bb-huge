@@ -321,6 +321,22 @@
     </div>
   </div>
 
+  <div class="card" style="margin-bottom:24px">
+    <div class="section-title">By Field</div>
+    {% set field_max = [field_counts.values()|list|max, 1]|max %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">
+      {% for f in ['web','mobile','binary','source_code'] %}
+      <div class="bar-row">
+        <span class="bar-label">{{ f.replace('_', ' ') }}</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:{{ ((field_counts[f] / field_max) * 100)|round }}%;background:var(--accent2)"></div>
+        </div>
+        <span class="bar-count">{{ field_counts[f] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
   <!-- Agent breakdown -->
   {% set agt_total = agent_counts.values()|sum %}
   {% if agt_total > 0 %}

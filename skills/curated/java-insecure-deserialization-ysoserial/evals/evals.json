@@ -1,0 +1,17 @@
+{
+    "skill_name": "java-insecure-deserialization-ysoserial",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the java-insecure-deserialization-ysoserial workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

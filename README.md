@@ -4,8 +4,8 @@
 > Find friends, share ideas, and start discussions with pro bug bounty hunters and software developers/engineers. 
 > **[Join the bb-huge Discord Server](https://discord.gg/M4Wd5DAZMw)**
 
-> `/bb-huge` — one command. Senior Bug Hunter, loaded.
-Not a portal. A **Context Engineering Architecture** that converts your AI agent into a disciplined bug bounty hunter with a single slash command. The web UI is the visible tip — the real power is what happens inside the agent's brain when the skill fires.
+> `/bb-huge` — one command. Multi-Domain Security Expert, loaded.
+Not a portal. A **Context Engineering Architecture** that converts your AI agent into a disciplined hunter across **Web, Mobile, Binary, and Source Code** with a single slash command. The web UI is the visible tip — the real power is the **350+ curated security skills** injected into the agent's brain.
 
 <!-- Demo Video -->
 | | |
@@ -23,33 +23,31 @@ Not a portal. A **Context Engineering Architecture** that converts your AI agent
 │  (gemini-cli / claude-code / codex / emmu / any MCP client) │
 └──────────┬─────────────────────────────────────┬────────────┘
            │  "/bb-huge"                         │  "find bugs on
-           │  triggers skill                     │   example.com"
+           │  triggers skill                     │   example.apk"
            ▼                                     ▼
 ┌──────────────────────────┐    ┌──────────────────────────────┐
 │  SKILL.md                │    │  MCP stdio Server            │
-│  • Senior Bug Hunter     │    │  • 30+ tools (CRUD + more)   │
-│    persona injected      │    │  • stdio transport           │
-│  • 7 SOPs loaded         │◄──►│  • stateless, fast           │
-│  • Full tool reference   │    │  • any agent, same API       │
+│  • Multi-Domain Persona  │    │  • 35+ tools (CRUD + stats)  │
+│  • 7 SOPs loaded         │◄──►│  • stdio transport           │
+│  • Field Dispatch system │    │  • stateless, fast           │
+│  • 350+ Curated Skills   │    │  • any agent, same API       │
 └──────────┬───────────────┘    └──────────┬───────────────────┘
            │                               │
            ▼                               ▼
 ┌──────────────────────────┐    ┌──────────────────────────────┐
-│  references/ (6 files)   │    │  PORTAL (Flask + SQLite)     │
-│  • im-scheduled.md       │    │  • Dashboard, Charts         │
-│  • bb-orchestrator.md    │    │  • Dashboard, Charts         │
-│  • bb-operator.md        │    │  • Findings CRUD             │
-│  • bb-recon.md           │    │  • Programs tracking         │
-│  • bb-eligible-vulns.md  │    │  • Observations/Hypotheses   │
-│  • bb-standards.md       │    │  • Evidence pipeline         │
-│  • bb-report-templates   │    │  • Assets & Endpoints        │
-└──────────────────────────┘    │  • Recon, Attachments        │
-                                │  • REST API                  │
+│  references/ (12+ files) │    │  PORTAL (Flask + SQLite)     │
+│  • Mobile Methodology    │    │  • Dashboard (Field Grouping)│
+│  • Binary Analysis       │    │  • Findings CRUD (4 domains) │
+│  • Source Code Audit     │    │  • Programs + Auto-Summary   │
+│  • Field-routed Templates│    │  • Observations/Hypotheses   │
+│  • Recon, Standards      │    │  • Evidence pipeline         │
+│  • Eligible Vulns        │    │  • Assets & Endpoints        │
+└──────────────────────────┘    │  • REST API                  │
                                 │  • Webhooks (Discord/TG)     │
                                 └──────────────────────────────┘
 ```
 
-Two systems, one interface. The **skill layer** gives the agent knowledge & discipline. The **portal layer** gives it persistent memory. They communicate through MCP.
+Two systems, one interface. The **skill layer** gives the agent domain-specific knowledge & discipline. The **portal layer** gives it persistent multi-field memory. They communicate through MCP.
 
 ---
 
@@ -78,16 +76,29 @@ bb-huge fixes this at the architectural level:
 |---------|----------------------|
 | Agent forgets between sessions | Portal stores everything — findings, notes, attachments, evidence |
 | You forget hunches and half-baked ideas | Observations & Hypotheses capture signals before they're findings |
-| Losing evidence between sessions | Structured evidence records (HTTP pairs, screenshots) linked to findings |
-| Disorganized attack surface | Assets & Endpoints track domains, hosts, API routes per program |
-| You forget the methodology | Skill injects Senior Bug Hunter SOPs into every new session |
+| Losing evidence between sessions | Structured evidence records (Frida logs, disassembly, code snippets) |
+| Disorganized attack surface | Assets & Endpoints track domains, APKs, binaries, and repos |
+| One field only (Web) | **Multi-Field support** for Mobile, Binary, and Source Code Audit |
+| You forget the methodology | Skill injects Multi-Domain Expert SOPs into every new session |
 | You waste time on setup | `/bb-huge` command boots everything in one call |
-| You skip logging "small" things | Skill enforces *capture-first* discipline |
-| Multiple agents, no coordination | Each agent sets its own `agent` field, stats show all activity |
-| Writing reports is painful | Report pack generator + ready-to-use report templates |
-| Scope confusion | Standards reference loaded at session start |
-| Testing blind — no creds, no context | Pre-hunt Q&A asks user once, persists forever |
-| Duplicate work | Similarity check scans existing findings/hypotheses before you create |
+| Testing blind — no context | **Auto-Summarization Protocol** identifies tech stack automatically |
+| Limited expert knowledge | **350+ Curated Security Skills** injected into the agent's brain |
+| Writing reports is painful | Field-routed report templates for every domain |
+
+---
+
+## 📚 Curated Security Skills (350+)
+
+bb-huge now comes bundled with a massive collection of **350+ community-sourced security skills**, organized into 14 categories. This turns your AI agent into a polymath expert.
+
+- **Web Security**: XSS, SQLi, SSRF, JWT, GraphQL, WebSmuggling, etc.
+- **Mobile**: Android/iOS static & dynamic analysis, Frida, Deep Links.
+- **Binary**: Reverse engineering, Heap exploits, ROP, Ghidra/GDB SOPs.
+- **Cloud/K8s**: AWS, Azure, Docker escapes, RBAC misconfigs.
+- **Offensive OSINT**: Recon, Shodan, Subdomain discovery.
+- **AI Security**: Prompt injection, RAG poisoning, Model inversion.
+
+**Browse the collection**: [skills/curated/MANIFEST.md](skills/curated/MANIFEST.md)
 
 ---
 
@@ -98,30 +109,26 @@ When you type the command, the agent's brain gets injected with:
 ```mermaid
 graph TB
     C["/bb-huge command"] --> SKILL[SKILL.md]
-    SKILL --> SOP0["SOP-0: Scheduled Mission<br/>Read constraints & prompts"]
-    SKILL --> SOP1["SOP-1: New Target<br/>Recon setup, skill roster"]
-    SKILL --> SOP2["SOP-2: Vulnerability Found<br/>Capture-first + evidence pipeline"]
-    SKILL --> SOP3["SOP-3: Resume Finding<br/>Full context restore"]
-    SKILL --> SOP4["SOP-4: End Session<br/>Closeout checklist"]
-    SKILL --> SOP5["SOP-5: Pre-Hunt Q&A<br/>Questioning layer"]
-    SKILL --> SOP6["SOP-6: Report Prep<br/>Generate report pack"]
-    SKILL --> MCP["30+ MCP Tools<br/>Findings, Observations,<br/>Hypotheses, Evidence,<br/>Assets, Endpoints,<br/>Recon, Programs"]
+    SKILL --> SOP1["SOP-1: New Target<br/>Onboarding + Field Setup"]
+    SKILL --> SOP2["SOP-2: Vulnerability Found<br/>Field-aware evidence pipeline"]
+    SKILL --> SOP5["SOP-5: Pre-Hunt Q&A<br/>Domain-specific context"]
+    SKILL --> SOP6["SOP-6: Report Prep<br/>Field-routed templates"]
+    SKILL --> ASP["Auto-Summarization<br/>Tech stack identification"]
+    SKILL --> DIS["Field Dispatch<br/>Methodology routing"]
+    SKILL --> MCP["35+ MCP Tools<br/>Field filtering, Stats,<br/>Multi-domain CRUD"]
+    SKILL --> CUR["350+ Curated Skills<br/>Community knowledge"]
     SKILL --> REFS["Reference Library"]
-    REFS --> SCHED[im-scheduled.md]
-    REFS --> ORCH[bb-orchestrator.md]
-    REFS --> OP[bb-operator.md]
-    REFS --> RECON[bb-recon.md]
-    REFS --> VULNS[bb-eligible-vulnerabilities.md]
-    REFS --> STD[bb-standards.md]
-    REFS --> TEMPLATES[bb-report-templates.md]
+    REFS --> METH["Methodologies<br/>Mobile, Binary, Source"]
+    REFS --> TEMP["Report Templates<br/>Field-routed index"]
 
     style C fill:#4a9,color:#fff
     style SKILL fill:#67b,color:#fff
     style MCP fill:#956,color:#fff
+    style CUR fill:#c44,color:#fff
     style REFS fill:#567,color:#fff
 ```
 
-**~2,000 lines of bug bounty knowledge** — every session. The reference library is lazy-loaded (you only pull what you need), but the core skill & tools are always there.
+**~3,000+ lines of specialized knowledge** — every session. The reference library and curated skills are lazy-loaded (you only pull what you need), but the core dispatch system is always active.
 
 ---
 
@@ -563,18 +570,27 @@ bb-huge/
 ├── skills/bb-huge/
 │   ├── SKILL.md                 # The brain — agent instruction
 │   ├── references/
-│   │   ├── im-scheduled.md           # Multi-skill routing & coordination
-│   │   ├── bb-orchestrator.md           # Multi-skill routing & coordination
+│   │   ├── mobile-methodology.md        # Android/iOS hunting guide
+│   │   ├── binary-analysis-methodology.md # RE & disassembly SOP
+│   │   ├── source-code-audit-methodology.md # White-box SAST patterns
+│   │   ├── mobile-report-templates.md   # Mobile-specific CWE templates
+│   │   ├── binary-report-templates.md   # Binary/RE crash templates
+│   │   ├── source-code-report-templates.md # Code-level vulnerability templates
 │   │   ├── bb-operator.md               # Full hunting methodology
 │   │   ├── bb-recon.md                  # Recon playbook + tool commands
-│   │   ├── bb-eligible-vulnerabilities.md  # Vulnerability taxonomy & CWE ref
-│   │   ├── bb-standards.md              # Scope rules, platform policies
-│   │   └── bb-report-templates.md       # Report templates & prep checklist
+│   │   ├── bb-eligible-vulnerabilities.md # Universal taxonomy (updated)
+│   │   ├── bb-standards.md              # Evidence standards (updated)
+│   │   ├── bb-report-templates.md       # Web templates & Field Index
+│   │   ├── im-scheduled.md              # Scheduled mission routing
+│   │   ├── bb-orchestrator.md           # Multi-skill coordination
+│   │   └── tools-list.md                # Tool command reference
 │   └── scripts/
 │       ├── bb.py                        # CLI helper
-│       ├── bb-dump-attachments.py       # Download all evidence
-│       └── bb-orchestrator-list-skills.py  # List available skills
-├── mcp_server.py                # MCP stdio server (30+ tools)
+│       └── bb-dump-attachments.py       # Download all evidence
+├── skills/curated/
+│   ├── MANIFEST.md              # Catalog of 350+ community skills
+│   └── install.sh               # Cross-platform skill installer
+├── mcp_server.py                # MCP stdio server (35+ tools)
 ├── THEORY_QUIZ.md               # 10-question agent comprehension test
 ├── tests/
 │   └── test_api.py              # API integration tests

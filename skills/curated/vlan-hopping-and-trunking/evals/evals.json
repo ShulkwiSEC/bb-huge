@@ -1,0 +1,17 @@
+{
+    "skill_name": "vlan-hopping-and-trunking",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the vlan-hopping-and-trunking workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

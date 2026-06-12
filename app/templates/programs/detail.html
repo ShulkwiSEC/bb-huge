@@ -391,6 +391,7 @@
         </div>
         <div class="prog-meta">
           <span class="badge badge-informational">{{ program.platform }}</span>
+          <span class="badge" style="background:var(--accent2);color:#000">{{ program.field }}</span>
           {% if program.program_url %}
             <a href="{{ program.program_url }}" target="_blank" rel="noopener" class="prog-url">↗ Program Page</a>
           {% endif %}
@@ -429,6 +430,44 @@
 
         <!-- LEFT COLUMN -->
         <div style="display:grid;gap:14px;">
+
+          <!-- Program Summary -->
+          <div class="brief-panel">
+            <div class="brief-panel-head">
+              <div class="brief-panel-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+                Program Summary
+              </div>
+            </div>
+            <div class="brief-panel-body">
+              {% if program.summary %}
+                <div style="font-size:13px;line-height:1.5;color:var(--text)">{{ program.summary }}</div>
+              {% else %}
+                <div class="ctx-empty">No summary generated yet</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Tech Stack -->
+          <div class="brief-panel">
+            <div class="brief-panel-head">
+              <div class="brief-panel-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
+                Technology Stack
+              </div>
+            </div>
+            <div class="brief-panel-body">
+              {% if program.tech_stack %}
+                <div class="chip-list">
+                  {% for tech in program.tech_stack %}
+                    <span class="brief-chip">{{ tech }}</span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="ctx-empty">No tech stack identified yet</div>
+              {% endif %}
+            </div>
+          </div>
 
           <!-- Saved Context -->
           <div class="brief-panel">

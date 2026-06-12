@@ -94,6 +94,15 @@
         </select>
       </div>
       <div class="filter-group">
+        <label>Field</label>
+        <select name="field" class="auto-submit" onchange="this.form.submit()">
+          <option value="">All</option>
+          {% for f in fields %}
+          <option value="{{ f }}" {{ 'selected' if field == f }}>{{ f }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-group">
         <label>Program</label>
         <select name="program_id" class="auto-submit" onchange="this.form.submit()">
           <option value="">All</option>

@@ -1,0 +1,17 @@
+{
+    "skill_name": "xxe-xml-external-entity-injection",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the xxe-xml-external-entity-injection workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

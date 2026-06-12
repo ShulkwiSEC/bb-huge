@@ -1,0 +1,213 @@
+<div class="evidence-card">
+  <div style="font-weight:600">{{ evidence.title }}</div>
+  <div class="meta-row" style="margin-top:8px">
+    <span class="meta-pill">{{ evidence.evidence_type }}</span>
+    {% if evidence.request_method and evidence.evidence_type in ('http_exchange', 'graphql_query') %}
+      <span class="meta-pill mono"><strong>{{ evidence.request_method }}</strong></span>
+    {% endif %}
+    {% if evidence.response_status and evidence.evidence_type in ('http_exchange', 'graphql_query') %}
+      <span class="meta-pill">HTTP {{ evidence.response_status }}</span>
+    {% endif %}
+    {% if evidence.evidence_type == 'source_code_vulnerability' and evidence.response_body_text %}
+      <span class="meta-pill mono" style="color:var(--accent2)"><strong>🔍 {{ evidence.response_body_text.strip()[:80] }}</strong></span>
+    {% endif %}
+  </div>
+  {% if evidence.summary %}<div class="tiny" style="margin-top:8px">{{ evidence.summary }}</div>{% endif %}
+  {% if evidence.request_url and evidence.evidence_type in ('http_exchange', 'graphql_query') %}
+    <div class="mono-tiny" style="margin-top:8px">{{ evidence.request_url }}</div>
+  {% endif %}
+
+  {# ── http_exchange ── #}
+  {% if evidence.evidence_type == 'http_exchange' %}
+    {% if evidence.request_body_text %}
+      <div class="evidence-section-label">Request Body</div>
+      <pre class="code-block">{{ evidence.request_body_text }}</pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Response Body</div>
+      <pre class="code-block">{{ evidence.response_body_text }}</pre>
+    {% endif %}
+
+  {# ── graphql_query ── #}
+  {% elif evidence.evidence_type == 'graphql_query' %}
+    {% if evidence.request_body_text %}
+      <div class="evidence-section-label">Query</div>
+      <pre class="code-block"><code class="language-graphql">{{ evidence.request_body_text }}</code></pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Response</div>
+      <pre class="code-block"><code class="language-json">{{ evidence.response_body_text }}</code></pre>
+    {% endif %}
+
+  {# ── note ── #}
+  {% elif evidence.evidence_type == 'note' %}
+    {% if evidence.request_body_text %}
+      <div class="md-body evidence-md">{{ evidence.request_body_text }}</div>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Details</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── screenshot / file ── #}
+  {% elif evidence.evidence_type in ('screenshot', 'file') %}
+    {% if evidence.request_body_text %}
+      <pre class="code-block">{{ evidence.request_body_text }}</pre>
+    {% endif %}
+
+  {# ── repro_step ── #}
+  {% elif evidence.evidence_type == 'repro_step' %}
+    {% if evidence.request_body_text %}
+      <div class="md-body evidence-md">{{ evidence.request_body_text }}</div>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Expected Result</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── environment ── #}
+  {% elif evidence.evidence_type == 'environment' %}
+    {% if evidence.request_body_text %}
+      <pre class="code-block"><code class="language-bash">{{ evidence.request_body_text }}</code></pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Notes</div>
+      <pre class="code-block">{{ evidence.response_body_text }}</pre>
+    {% endif %}
+
+  {# ── credential_context ── #}
+  {% elif evidence.evidence_type == 'credential_context' %}
+    {% if evidence.request_body_text %}
+      <pre class="code-block">{{ evidence.request_body_text }}</pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Context</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── mobile_static_analysis ── #}
+  {% elif evidence.evidence_type == 'mobile_static_analysis' %}
+    {% if evidence.auth_type %}
+      <div class="evidence-section-label">Language: {{ evidence.auth_type }}</div>
+    {% endif %}
+    {% if evidence.request_body_text %}
+      <pre class="code-block"><code class="language-{{ evidence.auth_type or 'java' }}">{{ evidence.request_body_text }}</code></pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Analysis Notes</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── mobile_dynamic_analysis ── #}
+  {% elif evidence.evidence_type == 'mobile_dynamic_analysis' %}
+    {% if evidence.request_body_text %}
+      <div class="evidence-section-label">Log Output</div>
+      <pre class="code-block log-output">{{ evidence.request_body_text }}</pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Analysis</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── mobile_network_traffic ── #}
+  {% elif evidence.evidence_type == 'mobile_network_traffic' %}
+    {% if evidence.request_body_text %}
+      <div class="evidence-section-label">Hex Dump</div>
+      <pre class="hex-dump">{{ evidence.request_body_text }}</pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Analysis</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── binary_analysis_output ── #}
+  {% elif evidence.evidence_type == 'binary_analysis_output' %}
+    {% if evidence.request_body_text %}
+      <div class="evidence-section-label">Disassembly</div>
+      <pre class="hex-dump disassembly">{{ evidence.request_body_text }}</pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Analysis</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── binary_ioc ── #}
+  {% elif evidence.evidence_type == 'binary_ioc' %}
+    {% if evidence.request_body_text %}
+      <div class="evidence-section-label">Indicators of Compromise</div>
+      <table class="ioc-table">
+      {% for line in evidence.request_body_text.split('\n') %}
+        {% set t = line.strip() %}
+        {% if t and t not in ('[', ']', '{', '}') %}
+        <tr>
+          {% if ':' in t and t.index(':') > 0 and not t.startswith('"') %}
+            <td class="ioc-key">{{ t.split(':', 1)[0].strip() }}</td>
+            <td class="ioc-value">{{ t.split(':', 1)[1].strip() }}</td>
+          {% else %}
+            <td class="ioc-value" colspan="2">{{ t }}</td>
+          {% endif %}
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </table>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Context</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── binary_exploit ── #}
+  {% elif evidence.evidence_type == 'binary_exploit' %}
+    {% if evidence.request_body_text %}
+      <pre class="code-block"><code class="language-{{ evidence.auth_type or 'python' }}">{{ evidence.request_body_text }}</code></pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Usage</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── source_code_vulnerability ── #}
+  {% elif evidence.evidence_type == 'source_code_vulnerability' %}
+    {% if evidence.request_body_text %}
+      <pre class="code-block code-snippet"><code class="language-{{ evidence.auth_type or 'python' }}">{{ evidence.request_body_text }}</code></pre>
+    {% endif %}
+
+  {# ── source_code_scan ── #}
+  {% elif evidence.evidence_type == 'source_code_scan' %}
+    {% if evidence.request_body_text %}
+      <div class="evidence-section-label">Scan Output</div>
+      <pre class="code-block scan-output">{{ evidence.request_body_text }}</pre>
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Summary</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+    {% endif %}
+
+  {# ── source_code_review_note ── #}
+  {% elif evidence.evidence_type == 'source_code_review_note' %}
+    {% if evidence.request_body_text %}
+      <div class="md-body evidence-md">{{ evidence.request_body_text }}</div>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <div class="evidence-section-label">Additional Notes</div>
+      <div class="md-body evidence-md">{{ evidence.response_body_text }}</div>
+    {% endif %}
+
+  {# ── other / fallback ── #}
+  {% else %}
+    {% if evidence.request_body_text %}
+      <pre class="code-block">{{ evidence.request_body_text }}</pre>
+    {% endif %}
+    {% if evidence.response_body_text %}
+      <pre class="code-block">{{ evidence.response_body_text }}</pre>
+    {% endif %}
+  {% endif %}
+
+  {% if evidence.source_tool %}
+    <div class="tiny" style="margin-top:10px">
+      Source: {{ evidence.source_tool }}
+      {%- if evidence.auth_type and evidence.evidence_type not in ('mobile_static_analysis', 'binary_exploit', 'source_code_vulnerability') %} | {{ evidence.auth_type }}{% endif -%}
+      {%- if evidence.account_label %} | Account: {{ evidence.account_label }}{% endif -%}
+    </div>
+  {% endif %}
+</div>

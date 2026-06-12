@@ -1,0 +1,17 @@
+{
+    "skill_name": "active-directory-asreproasting",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the active-directory-asreproasting workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

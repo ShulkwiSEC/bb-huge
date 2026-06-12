@@ -1,0 +1,17 @@
+{
+    "skill_name": "host-header-injection-attacks",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "Demonstrate the host-header-injection-attacks workflow against a test target.",
+            "expected_output": "Successful validation and reporting of the vulnerability.",
+            "assertions": [
+                {
+                    "name": "Execution Validation",
+                    "type": "regex",
+                    "pattern": "(?i)success|completed|identified"
+                }
+            ]
+        }
+    ]
+}

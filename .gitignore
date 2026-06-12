@@ -23,3 +23,6 @@ app/static/uploads/*
 discord_server_init.py
 fine_tune_dataset.jsonl
 bb_huge_dataset_genrator_for_fine_tune.py
+UPGRADE_EXPLAINER.md
+.tmp
+*tmp

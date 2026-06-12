@@ -87,6 +87,17 @@ Before testing any target, answer all three:
 - Default to 90-day disclosure timeline
 - CC security@<company>.com on first contact
 
+### Field-Specific Standards
+
+Different hunting domains have unique evidence requirements:
+
+| Field | Mandatory Evidence |
+|---|---|
+| `web` | HTTP Request/Response (structured), vulnerable URL. |
+| `mobile` | Decompiled code snippet (file:line), ADB PoC command. |
+| `binary` | Disassembly snippet, crash dump/stack trace, offset. |
+| `source_code` | File path and line number, reachable endpoint, SAST log. |
+
 ---
 
 ## Evidence Standards
