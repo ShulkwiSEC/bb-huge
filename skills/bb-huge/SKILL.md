@@ -870,7 +870,7 @@ Load **only what you need** for the current task:
 | `references/bb-report-templates.md` | Writing reports — templates for XSS, IDOR, SSRF, SQLi |
 | `references/opencode-browser.md` | Browser automation — full plugin guide, configuration, and bug bounty usage |
 | `references/im-scheduled.md` | Scheduled/automated missions only |
-
+| `references/magic-context.md` | Agent memory — use `ctx_memory` to persist recon facts, technique patterns, scope constraints, and dead-ends across sessions; use `ctx_search` at session start to recall all prior knowledge before testing |
 ---
 
 ## Portal
