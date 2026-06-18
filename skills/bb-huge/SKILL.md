@@ -521,9 +521,9 @@ Returns a diff bundle: new findings, updated findings, new observations, new hyp
 | `bb_add_note` | Log progress or dead ends without overwriting fields |
 | `bb_delete_note` | Delete a note from a finding |
 
-**Agent identity rule**: Always set `agent` to your identity
+**Agent identity rule**: Always set `agent` to your identity (dont use other agents identity or name)
 (`gemini-cli`, `claude`, `claude-code`, `opencode`, `codex`).
-Never use `manual` unless a human is entering through the web UI.
+as ai agent , Never use `manual` unless a human is entering through the web UI.
 
 Full tool reference: `<skill-base-path>/references/tools-list.md`
 
