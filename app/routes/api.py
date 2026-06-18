@@ -33,6 +33,9 @@ from ..models import (
     Program,
     ReconEntry,
     TargetContext,
+    Credential,
+    AlertRule,
+    ReportDraft,
 )
 from ..utils import allowed_file
 
@@ -94,10 +97,35 @@ def _limit_arg(default=50, max_limit=200):
     return min(int(request.args.get("limit", default)), max_limit)
 
 
+def _parse_id_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        return [int(x.strip()) for x in value.split(",") if x.strip().isdigit()]
+    return []
+
+
 def _validate_choice(value, allowed, field_name):
     if value not in allowed:
         return jsonify({"error": f"{field_name} must be one of {allowed}"}), 400
     return None
+
+
+def _check_alert_rules(event: str, payload: dict, program_id: int = None):
+    """Match alert rules against an event. Called from endpoints after state changes."""
+    query = AlertRule.query.filter_by(active=True, trigger_event=event)
+    if program_id:
+        query = query.filter(db.or_(AlertRule.program_id == program_id, AlertRule.program_id.is_(None)))
+    rules = query.all()
+    for rule in rules:
+        if rule.filter_expression:
+            if rule.filter_expression not in json.dumps(payload, default=str):
+                continue
+        rule.last_fired_at = datetime.now(timezone.utc)
+        _save()
+    return rules
 
 
 def _validate_from_data(data, field, allowed, name=None):
@@ -353,6 +381,24 @@ def _top_duplicate_hotspots(program_id):
     }
 
 
+@api_bp.get("/config")
+@api_key_required
+def get_config():
+    return jsonify({
+        "default_agent": current_app.config.get("DEFAULT_AGENT", "gemini-cli"),
+        "version": "2.0",
+        "features": {
+            "batch_assets": True,
+            "credential_vault": True,
+            "session_resume": True,
+            "finding_chaining": True,
+            "alert_rules": True,
+            "scope_versioning": True,
+            "report_drafts": True,
+        }
+    })
+
+
 @api_bp.get("/stats")
 @api_key_required
 def get_stats():
@@ -410,6 +456,10 @@ def list_findings():
     status = request.args.get("status", "")
     agent = request.args.get("agent", "")
     field = request.args.get("field", "")
+    program_id = request.args.get("program_id", type=int)
+    cwe = request.args.get("cwe", "").strip()
+    created_after = request.args.get("created_after", "").strip()
+    created_before = request.args.get("created_before", "").strip()
     limit = _limit_arg()
     offset = int(request.args.get("offset", 0))
 
@@ -431,6 +481,18 @@ def list_findings():
         query = query.filter_by(agent=agent)
     if field:
         query = query.filter_by(field=field)
+    if program_id:
+        query = query.filter_by(program_id=program_id)
+    if cwe:
+        query = query.filter(Finding.cwe.ilike(f"%{cwe}%"))
+    if created_after:
+        after_dt = _parse_datetime(created_after)
+        if after_dt:
+            query = query.filter(Finding.created_at >= after_dt)
+    if created_before:
+        before_dt = _parse_datetime(created_before)
+        if before_dt:
+            query = query.filter(Finding.created_at <= before_dt)
 
     total = query.count()
     findings = (
@@ -507,6 +569,7 @@ def create_finding():
         poc=data.get("poc", ""),
         program_id=data.get("program_id") or None,
         hypothesis_id=hypothesis_id or None,
+        related_finding_ids=_parse_id_list(data.get("related_finding_ids")),
     )
     _save(finding)
     return jsonify(finding.to_dict()), 201
@@ -542,6 +605,9 @@ def update_finding(fid):
 
     if "cvss" in data:
         finding.cvss = _parse_float(data["cvss"])
+
+    if "related_finding_ids" in data:
+        finding.related_finding_ids = _parse_id_list(data["related_finding_ids"])
 
     _touch(finding)
     _save()
@@ -731,6 +797,270 @@ def save_target_context(pid):
         db.session.add(ctx)
     _save()
     return jsonify(ctx.to_dict()), 201
+
+
+@api_bp.patch("/programs/<int:pid>/context")
+@api_key_required
+def patch_target_context(pid):
+    """Partial update — merges provided keys into existing context."""
+    _require_program(pid)
+    data = request.get_json(force=True) or {}
+    payload = data.get("data", data)
+
+    ctx = TargetContext.query.filter_by(program_id=pid).first()
+    if ctx:
+        existing = ctx.data
+        existing.update(payload)
+        ctx.data = existing
+    else:
+        ctx = TargetContext(program_id=pid, _data=json.dumps(payload))
+        db.session.add(ctx)
+    _save()
+    return jsonify(ctx.to_dict()), 200
+
+
+# ── Credential Vault ────────────────────────────────────────────────────────────
+
+
+@api_bp.get("/programs/<int:pid>/credentials")
+@api_key_required
+def list_credentials(pid):
+    _require_program(pid)
+    creds = Credential.query.filter_by(program_id=pid).order_by(Credential.label).all()
+    return jsonify([c.to_dict(include_secret=False) for c in creds])
+
+
+@api_bp.post("/programs/<int:pid>/credentials")
+@api_key_required
+def create_credential(pid):
+    _require_program(pid)
+    data = request.get_json(force=True) or {}
+    label = (data.get("label") or "").strip()
+    if not label:
+        return jsonify({"error": "label is required"}), 400
+    secret = (data.get("secret_encrypted") or "").strip()
+    if not secret:
+        return jsonify({"error": "secret_encrypted is required"}), 400
+
+    cred = Credential(
+        program_id=pid,
+        label=label,
+        credential_type=data.get("credential_type", "password"),
+        username_encrypted=data.get("username_encrypted"),
+        secret_encrypted=secret,
+        url=data.get("url"),
+        notes=data.get("notes", ""),
+        active=data.get("active", True),
+    )
+    db.session.add(cred)
+    _save()
+    return jsonify(cred.to_dict(include_secret=True)), 201
+
+
+@api_bp.delete("/credentials/<int:cid>")
+@api_key_required
+def delete_credential(cid):
+    cred = Credential.query.get_or_404(cid)
+    db.session.delete(cred)
+    _save()
+    return jsonify({"deleted": True})
+
+
+# ── Alert Rules ─────────────────────────────────────────────────────────────────
+
+
+@api_bp.get("/programs/<int:pid>/alerts")
+@api_key_required
+def list_alert_rules(pid):
+    query = AlertRule.query.filter(
+        db.or_(AlertRule.program_id == pid, AlertRule.program_id.is_(None))
+    ).order_by(AlertRule.name)
+    return jsonify([r.to_dict() for r in query.all()])
+
+
+@api_bp.post("/programs/<int:pid>/alerts")
+@api_key_required
+def create_alert_rule(pid):
+    _require_program(pid)
+    data = request.get_json(force=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    event = (data.get("trigger_event") or "").strip()
+    if not event:
+        return jsonify({"error": "trigger_event is required"}), 400
+
+    rule = AlertRule(
+        program_id=pid,
+        name=name,
+        trigger_event=event,
+        filter_expression=data.get("filter_expression", ""),
+        webhook_url=data.get("webhook_url"),
+        discord_channel=data.get("discord_channel"),
+        telegram_chat_id=data.get("telegram_chat_id"),
+        slack_webhook_url=data.get("slack_webhook_url"),
+        active=data.get("active", True),
+    )
+    db.session.add(rule)
+    _save()
+    return jsonify(rule.to_dict()), 201
+
+
+@api_bp.patch("/alerts/<int:rid>")
+@api_key_required
+def update_alert_rule(rid):
+    rule = AlertRule.query.get_or_404(rid)
+    data = request.get_json(force=True) or {}
+    for field in ("name", "trigger_event", "filter_expression", "webhook_url",
+                  "discord_channel", "telegram_chat_id", "slack_webhook_url"):
+        if field in data:
+            setattr(rule, field, data[field])
+    if "active" in data:
+        rule.active = bool(data["active"])
+    _save()
+    return jsonify(rule.to_dict())
+
+
+@api_bp.delete("/alerts/<int:rid>")
+@api_key_required
+def delete_alert_rule(rid):
+    rule = AlertRule.query.get_or_404(rid)
+    db.session.delete(rule)
+    _save()
+    return jsonify({"deleted": True})
+
+
+# ── Report Drafts ──────────────────────────────────────────────────────────────
+
+
+@api_bp.get("/findings/<int:fid>/drafts")
+@api_key_required
+def list_report_drafts(fid):
+    Finding.query.get_or_404(fid)
+    drafts = ReportDraft.query.filter_by(finding_id=fid).order_by(ReportDraft.version.desc()).all()
+    return jsonify([d.to_dict() for d in drafts])
+
+
+@api_bp.post("/findings/<int:fid>/drafts")
+@api_key_required
+def create_report_draft(fid):
+    finding = Finding.query.get_or_404(fid)
+    data = request.get_json(force=True) or {}
+
+    prev = ReportDraft.query.filter_by(finding_id=fid).order_by(ReportDraft.version.desc()).first()
+    next_ver = (prev.version + 1) if prev else 1
+
+    draft = ReportDraft(
+        finding_id=fid,
+        version=next_ver,
+        title=data.get("title", finding.title),
+        description=data.get("description", ""),
+        poc=data.get("poc", ""),
+        summary=data.get("summary", ""),
+        impact=data.get("impact", ""),
+        cwe=data.get("cwe", finding.cwe),
+        cvss=data.get("cvss", finding.cvss),
+    )
+    db.session.add(draft)
+    _save()
+    return jsonify(draft.to_dict()), 201
+
+
+@api_bp.get("/findings/<int:fid>/drafts/<int:vid>")
+@api_key_required
+def get_report_draft(fid, vid):
+    draft = ReportDraft.query.filter_by(finding_id=fid, version=vid).first_or_404()
+    return jsonify(draft.to_dict())
+
+
+# ── Session Resume ──────────────────────────────────────────────────────────────
+
+
+@api_bp.get("/programs/<int:pid>/diff")
+@api_key_required
+def get_program_diff(pid):
+    _require_program(pid)
+    since_raw = request.args.get("since", "")
+    if not since_raw:
+        return jsonify({"error": "since parameter is required (ISO datetime)"}), 400
+
+    since_dt = _parse_datetime(since_raw)
+    if not since_dt:
+        return jsonify({"error": "cannot parse since value"}), 400
+
+    new_findings = Finding.query.filter(
+        Finding.program_id == pid, Finding.created_at >= since_dt
+    ).order_by(Finding.created_at.desc()).all()
+
+    updated_findings = Finding.query.filter(
+        Finding.program_id == pid,
+        Finding.updated_at >= since_dt,
+        Finding.created_at < since_dt,
+    ).order_by(Finding.updated_at.desc()).all()
+
+    new_observations = Observation.query.filter(
+        Observation.program_id == pid, Observation.created_at >= since_dt
+    ).order_by(Observation.created_at.desc()).all()
+
+    new_hypotheses = Hypothesis.query.filter(
+        Hypothesis.program_id == pid, Hypothesis.created_at >= since_dt
+    ).order_by(Hypothesis.created_at.desc()).all()
+
+    new_recon = ReconEntry.query.filter(
+        ReconEntry.program_id == pid, ReconEntry.created_at >= since_dt
+    ).order_by(ReconEntry.created_at.desc()).all()
+
+    return jsonify({
+        "since": since_raw,
+        "new_findings": [f.to_dict() for f in new_findings],
+        "updated_findings": [f.to_dict() for f in updated_findings],
+        "new_observations": [o.to_dict() for o in new_observations],
+        "new_hypotheses": [h.to_dict() for h in new_hypotheses],
+        "new_recon": [r.to_dict() for r in new_recon],
+    })
+
+
+# ── Scope History ───────────────────────────────────────────────────────────────
+
+
+@api_bp.get("/programs/<int:pid>/assets/history")
+@api_key_required
+def get_scope_history(pid):
+    _require_program(pid)
+    assets = Asset.query.filter_by(program_id=pid).order_by(Asset.version.desc(), Asset.identifier).all()
+    return jsonify({
+        "program_id": pid,
+        "assets": [a.to_dict() for a in assets],
+    })
+
+
+@api_bp.post("/programs/<int:pid>/assets/version-bump")
+@api_key_required
+def bump_asset_version(pid):
+    """Increment version for all active assets — use when scope changes."""
+    _require_program(pid)
+    data = request.get_json(force=True) or {}
+    deprecate_ids = data.get("deprecate_ids", [])
+    new_version = data.get("new_version")
+
+    if deprecate_ids:
+        now = datetime.now(timezone.utc)
+        for asset in Asset.query.filter(Asset.id.in_(deprecate_ids), Asset.program_id == pid).all():
+            asset.active = False
+            asset.deprecated_at = now
+            _touch(asset)
+
+    if new_version is not None:
+        assets = Asset.query.filter_by(program_id=pid).all()
+        for asset in assets:
+            asset.version = new_version
+    else:
+        assets = Asset.query.filter_by(program_id=pid, active=True).all()
+        for asset in assets:
+            asset.version += 1
+
+    _save()
+    return jsonify({"ok": True})
 
 
 @api_bp.get("/programs/<int:pid>/brief")
@@ -1320,6 +1650,56 @@ def create_asset(pid):
     )
     _save(asset)
     return jsonify(asset.to_dict()), 201
+
+
+@api_bp.post("/programs/<int:pid>/assets/batch")
+@api_key_required
+def create_assets_batch(pid):
+    """Batch-create multiple assets under a program."""
+    _require_program(pid)
+    data = request.get_json(force=True) or {}
+    assets_data = data.get("assets", [])
+    if not assets_data or not isinstance(assets_data, list):
+        return jsonify({"error": "assets list is required"}), 400
+
+    created = []
+    errors = []
+    for idx, asset_data in enumerate(assets_data):
+        identifier = (asset_data.get("identifier") or "").strip()
+        if not identifier:
+            errors.append({"index": idx, "error": "identifier is required"})
+            continue
+
+        kind = asset_data.get("kind", "other")
+        if kind not in ASSET_KINDS:
+            errors.append({"index": idx, "error": f"kind must be one of {ASSET_KINDS}"})
+            continue
+
+        environment = asset_data.get("environment", "unknown")
+        if environment not in ASSET_ENVIRONMENTS:
+            errors.append({"index": idx, "error": f"environment must be one of {ASSET_ENVIRONMENTS}"})
+            continue
+
+        asset = Asset(
+            program_id=pid,
+            kind=kind,
+            identifier=identifier,
+            environment=environment,
+            notes=asset_data.get("notes", ""),
+            active=asset_data.get("active", True),
+        )
+        db.session.add(asset)
+        created.append(asset)
+
+    if created:
+        _save()
+
+    return jsonify({
+        "created": [asset.to_dict() for asset in created],
+        "errors": errors,
+        "total_created": len(created),
+        "total_errors": len(errors),
+    }), 201 if created else 400
 
 
 @api_bp.patch("/assets/<int:aid>")

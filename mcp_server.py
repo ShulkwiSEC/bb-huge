@@ -1049,6 +1049,218 @@ TOOLS = [
             },
         },
     },
+
+    # ── Advanced / Game-changer tools ─────────────────────────────────────────
+    {
+        "name": "bb_get_config",
+        "description": "Get bb-huge runtime configuration (default agent, features, version). Call at session start to discover available features.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "bb_batch_add_assets",
+        "description": "Batch-create multiple assets under a program in one call. Use instead of multiple bb_add_asset calls when initializing scope or bulk-importing recon results.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "assets"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "assets": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["kind", "identifier"],
+                        "properties": {
+                            "kind": {
+                                "type": "string",
+                                "enum": ["domain", "subdomain", "api_host", "mobile_app", "repo", "other"],
+                            },
+                            "identifier": {"type": "string"},
+                            "environment": {
+                                "type": "string",
+                                "enum": ["prod", "staging", "dev", "test", "unknown"],
+                                "default": "unknown",
+                            },
+                            "notes": {"type": "string"},
+                            "active": {"type": "boolean", "default": True},
+                        },
+                    },
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_list_credentials",
+        "description": "List stored credentials for a program (labels + metadata only — secrets never exposed).",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {"program_id": {"type": "integer"}},
+        },
+    },
+    {
+        "name": "bb_add_credential",
+        "description": "Store an encrypted credential for a program. Secrets are encrypted at rest before storage. Use for login credentials, API keys, and tokens.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "label", "secret_encrypted"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "label": {"type": "string"},
+                "credential_type": {
+                    "type": "string",
+                    "enum": ["password", "api_key", "token", "ssh_key", "other"],
+                    "default": "password",
+                },
+                "username_encrypted": {"type": "string"},
+                "secret_encrypted": {"type": "string"},
+                "url": {"type": "string"},
+                "notes": {"type": "string"},
+                "active": {"type": "boolean", "default": True},
+            },
+        },
+    },
+    {
+        "name": "bb_delete_credential",
+        "description": "Delete a stored credential by ID.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {"id": {"type": "integer"}},
+        },
+    },
+    {
+        "name": "bb_list_alerts",
+        "description": "List alert rules for a program (including global rules). Shows trigger events and destinations.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {"program_id": {"type": "integer"}},
+        },
+    },
+    {
+        "name": "bb_add_alert",
+        "description": "Create a new alert rule. Fires when trigger_event matches and optional filter_expression is satisfied.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "name", "trigger_event"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "name": {"type": "string"},
+                "trigger_event": {"type": "string", "description": "finding.created, finding.confirmed, finding.reported, finding.rewarded, finding.denied, recon.added"},
+                "filter_expression": {"type": "string", "description": "Optional JSON substring to filter payloads"},
+                "webhook_url": {"type": "string"},
+                "discord_channel": {"type": "string"},
+                "telegram_chat_id": {"type": "string"},
+                "slack_webhook_url": {"type": "string"},
+                "active": {"type": "boolean", "default": True},
+            },
+        },
+    },
+    {
+        "name": "bb_update_alert",
+        "description": "Update an alert rule's fields.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "name": {"type": "string"},
+                "trigger_event": {"type": "string"},
+                "filter_expression": {"type": "string"},
+                "webhook_url": {"type": "string"},
+                "discord_channel": {"type": "string"},
+                "telegram_chat_id": {"type": "string"},
+                "slack_webhook_url": {"type": "string"},
+                "active": {"type": "boolean"},
+            },
+        },
+    },
+    {
+        "name": "bb_delete_alert",
+        "description": "Delete an alert rule by ID.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {"id": {"type": "integer"}},
+        },
+    },
+    {
+        "name": "bb_list_drafts",
+        "description": "List report draft versions for a finding, newest first.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["finding_id"],
+            "properties": {"finding_id": {"type": "integer"}},
+        },
+    },
+    {
+        "name": "bb_create_draft",
+        "description": "Create a new report draft version for a finding (auto-increments version). Use when iterating on a report before submission.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["finding_id"],
+            "properties": {
+                "finding_id": {"type": "integer"},
+                "title": {"type": "string"},
+                "description": {"type": "string"},
+                "poc": {"type": "string"},
+                "summary": {"type": "string"},
+                "impact": {"type": "string"},
+                "cwe": {"type": "string"},
+                "cvss": {"type": "number"},
+            },
+        },
+    },
+    {
+        "name": "bb_get_draft",
+        "description": "Get a specific report draft version by finding_id and version number.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["finding_id", "version"],
+            "properties": {
+                "finding_id": {"type": "integer"},
+                "version": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_session_resume",
+        "description": "Get all new/updated work since a timestamp. Use at session start to pick up where you left off.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "since"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "since": {"type": "string", "description": "ISO-8601 datetime e.g. 2026-06-18T00:00:00"},
+            },
+        },
+    },
+    {
+        "name": "bb_get_scope_history",
+        "description": "Get all assets with version numbers and deprecation info. Shows scope change history.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {"program_id": {"type": "integer"}},
+        },
+    },
+    {
+        "name": "bb_bump_asset_version",
+        "description": "Increment version counter for all active assets in a program. Use when scope changes.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "deprecate_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Asset IDs to deprecate",
+                },
+                "new_version": {"type": "integer", "description": "If set, all assets get this version instead of auto-increment"},
+            },
+        },
+    },
 ]
 
 
@@ -1142,6 +1354,57 @@ def dispatch(name: str, args: dict) -> Any:
 
     elif name == "bb_notify":
         return api_post("/notify", args)
+
+    elif name == "bb_get_config":
+        return api_get("/config")
+
+    elif name == "bb_batch_add_assets":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/assets/batch", args)
+
+    elif name == "bb_list_credentials":
+        return api_get(f"/programs/{args['program_id']}/credentials")
+
+    elif name == "bb_add_credential":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/credentials", args)
+
+    elif name == "bb_delete_credential":
+        return api_delete(f"/credentials/{args['id']}")
+
+    elif name == "bb_list_alerts":
+        return api_get(f"/programs/{args['program_id']}/alerts")
+
+    elif name == "bb_add_alert":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/alerts", args)
+
+    elif name == "bb_update_alert":
+        rid = args.pop("id")
+        return api_patch(f"/alerts/{rid}", args)
+
+    elif name == "bb_delete_alert":
+        return api_delete(f"/alerts/{args['id']}")
+
+    elif name == "bb_list_drafts":
+        return api_get(f"/findings/{args['finding_id']}/drafts")
+
+    elif name == "bb_create_draft":
+        fid = args.pop("finding_id")
+        return api_post(f"/findings/{fid}/drafts", args)
+
+    elif name == "bb_get_draft":
+        return api_get(f"/findings/{args['finding_id']}/drafts/{args['version']}")
+
+    elif name == "bb_session_resume":
+        return api_get(f"/programs/{args['program_id']}/diff?since={args['since']}")
+
+    elif name == "bb_get_scope_history":
+        return api_get(f"/programs/{args['program_id']}/assets/history")
+
+    elif name == "bb_bump_asset_version":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/assets/version-bump", args)
 
     elif name == "bb_create_program":
         return api_post("/programs", args)

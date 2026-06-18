@@ -103,6 +103,26 @@ sensitive data IS the bug. Log it.**
 When the user says `/bb-huge init lets init hunt workspace for bug bounty on Sage bug bounty program`,
 you execute the full initialization sequence below — no partial steps, no shortcuts.
 
+**CRITICAL — No Q&A Proliferation:** Do NOT ask the user SOP-5 questions if you already have the
+information from h1-brain, Intigriti API, or other program data sources. Autofill everything you
+can, and only escalate for credentials/tokens that require human input. The INIT SEQUENCE is
+designed to complete in <5 minutes with zero back-and-forth on program metadata.
+
+---
+
+### Platform-Aware Init Dispatch
+
+Before starting the 7-step sequence, determine the **platform** and route accordingly:
+
+| Platform | Data Source | Autofill Capability |
+|----------|-------------|---------------------|
+| **HackerOne** | h1-brain (`hack()`, `search_programs()`, `fetch_program_scopes()`) | Full — scope, tech stack, auth info, attack briefing, disclosed reports |
+| **Intigriti** | Intigriti API (`get_program_details()`, `get_program_domains()`) | Partial — scope from API, credentials need user |
+| **Bugcrowd / Other** | Web search, disclosed reports | Minimal — ask user for most fields |
+
+**Rule:** If h1-brain has data → autofill. No exceptions. Never ask "what tech stack?"
+when h1-brain already returned it.
+
 ---
 
 ### INIT SEQUENCE — 7 Steps (all required)
@@ -120,7 +140,7 @@ bb_create_program({
   name: "<Program Name>",
   platform: "<hackerone|bugcrowd|intigriti|private|...>",
   program_url: "<link to program page if known>",
-  scope_in: [],   // fill from SOP-5 or leave empty for now
+  scope_in: [],   // fill from h1-brain or leave empty for now
   scope_out: []
 })
 ```
@@ -132,16 +152,86 @@ bb_get_program_brief(program_id)
 This returns: scope, recent findings, open observations/hypotheses, recon summary.
 Read every field. This is your ground truth.
 
-#### Step 4 — Load Context or Run Pre-Hunt Q&A (SOP-5)
+#### Step 4 — Load Context or Autofill (NO Q&A on known platforms)
+
 ```
 bb_get_context(program_id)
 ```
-- If context exists → load it, skip Q&A
-- If empty → **run SOP-5 Pre-Hunt Questioning Layer** (see below)
-  Collect all answers, then:
-  ```
-  bb_save_context({ program_id: <id>, data: { ...answers } })
-  ```
+
+- **If context exists** → load it, skip Q&A
+- **If empty** → run **Autofill Protocol** (NOT user Q&A) based on platform:
+
+##### HackerOne Autofill Protocol (automatic, zero user questions)
+
+```
+1. h1-brain_search_programs(query="<program name>")
+   → extract program handle (slug) and program_id
+
+2. h1-brain_hack(handle="<slug>")
+   → attack briefing with:
+     - In-scope domains/assets
+     - Out-of-scope boundaries
+     - Tech stack / descriptions
+     - Auth mechanisms
+     - Known vulnerabilities
+     - Bounty range
+
+3. (optional) h1-brain_search_disclosed_reports(program="<slug>", limit=5)
+   → understanding of what kind of bugs pay on this program
+
+4. Auto-save context from h1-brain data:
+   bb_save_context({
+     program_id: <id>,
+     data: {
+       "target_domains": ["<from h1-brain scope>"],
+       "business_context": "<from program description>",
+       "program_type": "private HackerOne",
+       "tech_stack": ["<from h1-brain briefing>"],
+       "auth_mechanism": "<from h1-brain>",
+       "focus_areas": ["<derived from disclosed reports>"],
+       "notes": "Autofilled from h1-brain. Credentials needed from user."
+     }
+   })
+```
+
+**Only escalate to user if**:
+- No test account credentials in h1-brain → ask once: "What credentials do I use?"
+- Auth tokens / API keys not in h1-brain → ask once
+- Everything else → autofilled from h1-brain
+
+##### Intigriti Autofill Protocol
+
+```
+1. intigriti_get_program_details(program_id="<guid>")
+   → program info, max bounty, status, scope version
+
+2. intigriti_get_program_domains(program_id="<guid>", version_id="<version>")
+   → full domain list, in-scope URLs, endpoints
+
+3. Auto-save context:
+   bb_save_context({
+     program_id: <id>,
+     data: {
+       "target_domains": ["<from intigriti scope>"],
+       "business_context": "<from program description>",
+       "program_type": "private Intigriti",
+       "tech_stack": [],
+       "auth_mechanism": "",
+       "notes": "Autofilled from Intigriti API. Credentials needed from user."
+     }
+   })
+```
+
+**Only escalate to user for**: credentials, API keys, focus areas.
+
+##### Unknown Platform Fallback (last resort — minimize this path)
+
+If no API/program data source is available, ask **exactly 3 questions** (no more):
+1. Target domain(s) and what the app does
+2. Test credentials
+3. Any special auth headers
+
+Then autofill everything else as "unknown" and save context.
 
 #### Step 5 — Scaffold Workspace Directory
 Create the following directory structure on disk:
@@ -192,55 +282,67 @@ Log all findings to bb-huge (http://localhost:5000) via MCP tools.
 This is persistent memory — use it for every observation, hypothesis, and finding.
 ```
 
-**Generate `scope.yaml`**:
+**Generate `scope.yaml`** — pre-populated from h1-brain scope data (if available):
 
 ```yaml
-# scope.yaml — Edit after SOP-5 Q&A to add real domains
+# scope.yaml — Populated from program scope data (h1-brain / Intigriti API)
 program: "<PROGRAM>"
 platform: "<PLATFORM>"
 
 in_scope:
-  - "<primary-domain.com>"
-  - "*.<primary-domain.com>"
+  - "<primary-domain>"
+  - "*.<primary-domain>"
   # Add more from program scope page
 
 out_of_scope:
   - "# Add explicitly excluded domains here"
 
-notes: "Update this file with actual program scope before testing."
+notes: "Auto-populated from platform API. Verify before testing."
 ```
 
 #### Step 6 — Initial Asset Logging
-For every domain in scope, create an asset entry:
+For every in-scope domain/subdomain, create an asset entry using the correct bb_add_asset
+param schema:
+
 ```
 bb_add_asset({
   program_id: <id>,
-  domain: "<domain>",
-  kind: "web",      // web | api | mobile | infra
-  environment: "production"
+  kind: "domain" | "subdomain" | "api_host"   // NOT "web"
+  identifier: "<domain-or-subdomain>",         // NOT "domain" field
+  environment: "production",
+  notes: "In-scope from program brief"
 })
 ```
 
+**Batch all assets in parallel** — never add them one-by-one. Use the correct asset kinds:
+- Root domains → `kind: "domain"`
+- Subdomains → `kind: "subdomain"`
+- API endpoints → `kind: "api_host"`
+- Mobile apps → `kind: "mobile_app"`
+- Source repos → `kind: "repo"`
+
 #### Step 7 — Status Report
-Print a formatted workspace summary:
+Print a formatted workspace summary. Include autofill source in the report:
 
 ```
-╔══════════════════════════════════════════════════════╗
-║  bb-huge Workspace Initialized                       ║
-╠══════════════════════════════════════════════════════╣
-║  Program:   <name>                                   ║
-║  Platform:  <platform>                               ║
-║  Portal ID: <program_id>                             ║
-║  Assets:    <count> domains registered               ║
-║  Workspace: ./workspaces/<slug>/                     ║
-╠══════════════════════════════════════════════════════╣
-║  Context saved: YES / NO (run SOP-5 to complete)     ║
-║  Scope guard:   scope.yaml written                   ║
-║  Agent auth:    AGENTS.md written                    ║
-╠══════════════════════════════════════════════════════╣
-║  READY TO HUNT                                       ║
-║  Next: /recon <domain> to start enumeration          ║
-╚══════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════╗
+║  bb-huge Workspace Initialized                                    ║
+╠═══════════════════════════════════════════════════════════════════╣
+║  Program:   <name>                              Portal ID: <id>  ║
+║  Platform:  <platform>                                           ║
+║  Source:    <autofilled from h1-brain | autofilled from Intigriti║
+║              API | partial - 3 Qs asked>                         ║
+║  Assets:    <count> registered                                   ║
+║  Workspace: ./workspaces/<slug>/                                 ║
+╠═══════════════════════════════════════════════════════════════════╣
+║  Context:   Saved ✓                                              ║
+║  Scope:     scope.yaml written (N in-scope, M out-of-scope)      ║
+║  Auth:      AGENTS.md written                                    ║
+╠═══════════════════════════════════════════════════════════════════╣
+║  ✅ READY TO HUNT                                                ║
+║  Action: pick a domain and start /recon or ask the user          ║
+║          "which program should I hunt first?"                    ║
+╚═══════════════════════════════════════════════════════════════════╝
 ```
 
 ---
@@ -353,10 +455,62 @@ header automatically — no extra setup needed.
 | `bb_add_asset` | Log discovered domain, subdomain, API host |
 | `bb_update_asset` | Change kind, environment, or deactivate |
 | `bb_delete_asset` | Remove an asset and its endpoints |
+| `bb_batch_add_assets` | **Batch-create multiple assets at once** — use during init instead of calling bb_add_asset repeatedly |
+| `bb_get_scope_history` | Show all assets with version numbers and deprecation info |
+| `bb_bump_asset_version` | Bump version counter after scope changes; optionally deprecate assets |
 | `bb_list_endpoints` | Browse API routes under an asset |
 | `bb_add_endpoint` | Document URL path with method, auth info |
 | `bb_update_endpoint` | Fix path or metadata |
 | `bb_delete_endpoint` | Remove stale endpoint |
+
+### Configuration & Initialization
+
+| Tool | When to use |
+|------|-------------|
+| `bb_get_config` | Discover runtime settings (default agent, feature flags, version) — call at session start |
+
+### Credentials Vault
+
+| Tool | When to use |
+|------|-------------|
+| `bb_list_credentials` | List stored credentials (labels/metadata only, no secrets) |
+| `bb_add_credential` | Store encrypted credential (login, API key, token) for a program |
+| `bb_delete_credential` | Remove a stored credential |
+
+**Encryption**: Secrets are encrypted at rest with Fernet (symmetric AES-128-CBC). Credentials survive server restarts. Only the label, type, and URL are visible in listings — secrets require explicit `bb_add_credential` to store and `bb_delete_credential` to remove.
+
+### Alert Rules
+
+| Tool | When to use |
+|------|-------------|
+| `bb_list_alerts` | View alert rules for a program |
+| `bb_add_alert` | Create rule that fires on events (finding.created, finding.confirmed, etc.) |
+| `bb_update_alert` | Change trigger, destination, or active state |
+| `bb_delete_alert` | Remove an alert rule |
+
+Events: `finding.created` / `finding.confirmed` / `finding.reported` / `finding.rewarded` / `finding.denied` / `recon.added`. Optional `filter_expression` constrains payloads by JSON substring match.
+
+### Report Drafts
+
+| Tool | When to use |
+|------|-------------|
+| `bb_list_drafts` | List all draft versions for a finding |
+| `bb_create_draft` | Save a new draft version (auto-increments version) |
+| `bb_get_draft` | Retrieve a specific version |
+
+Use to iterate on a report before submission. Each `bb_create_draft` call creates a versioned snapshot. The latest version is always the highest version number.
+
+### Session Resume
+
+| Tool | When to use |
+|------|-------------|
+| `bb_session_resume` | Get all new/updated work since a timestamp — use at session start |
+
+```json
+bb_session_resume({ "program_id": 1, "since": "2026-06-18T00:00:00" })
+```
+
+Returns a diff bundle: new findings, updated findings, new observations, new hypotheses, new recon entries.
 
 ### Notifications & Stats
 
@@ -593,6 +747,21 @@ summary and tech stack to help future sessions.
 
 **Most important step for a new target.** Collect context once, persist forever.
 
+**CRITICAL RULE — Platform-Aware Context Collection:**
+Before running ANY user-facing Q&A, check if the platform already provides this data:
+- **HackerOne** → `h1-brain_hack(handle)` gives you: scope, tech stack, auth info, attack
+  briefing, bounty details, test account policies. **Use it. Do NOT ask the user.**
+- **Intigriti** → `intigriti_get_program_details(id)` + `get_program_domains(id, version)`
+  gives you full domain scope and program info. **Use it. Do NOT ask the user.**
+- **Bugcrowd / Unknown** → You may need to ask, but keep it to **3 questions max**.
+
+**Only questions that survive platform autofill are:**
+1. "What credentials do I use?" (if not in platform data)
+2. "Any specific focus areas?" (optional — can skip)
+3. "Is there a source code repo?" (if not obvious)
+
+Everything else must be autofilled from platform APIs.
+
 **When to run:** New target assigned, OR `bb_get_context()` returns empty.
 **When NOT to run:** Context already exists, OR resuming existing target.
 
@@ -602,78 +771,55 @@ summary and tech stack to help future sessions.
 2. If not found: bb_create_program({name})
 3. bb_get_program_brief({program_id})
 4. If bb_get_context() returns non-empty → skip to testing
-5. If empty → RUN QUESTIONING (below)
+5. If empty → RUN AUTOFILL PROTOCOL (see Step 4 in INIT SEQUENCE)
+   - HackerOne: h1-brain_hack(handle) → auto-save context
+   - Intigriti: get_program_domains() → auto-save context
+   - Unknown: ask exactly 3 questions → save
 6. bb_save_context({program_id, data})
 ```
 
-**Mandatory questions — every category:**
+**Autofill mapper — h1-brain `hack()` output → context fields:**
 
-```
-📌 TARGET BASICS
-  - Target domain(s) / application name?
-  - What does this app/company do? (business context)
-  - Is this public bounty, private, or pentest?
+| h1-brain field | Maps to context key |
+|----------------|-------------------|
+| `program.summary` / `program.description` | `business_context` |
+| `scopes.in_scope[*].asset` | `target_domains` |
+| `scopes.out_of_scope[*].asset` | (stored in notes) |
+| `briefing.tech_stack` | `tech_stack` |
+| `briefing.auth_mechanisms` | `auth_mechanism` |
+| `briefing.test_accounts` | `credentials` |
+| `briefing.program_type` | `program_type` |
+| `disclosed_reports[*].weakness` | `focus_areas` (heuristic — most common vuln types) |
 
-🔐 ACCESS & CREDENTIALS
-  - Tester accounts / credentials? (email:password)
-  - Raw cookies or session tokens?
-  - API keys or OAuth client credentials?
-  - Special headers needed?
-  - Auth mechanism? (JWT, session cookie, OAuth, SSO)
-
-🌐 ATTACK SURFACE
-  - Source code repository available?
-  - Known subdomains or endpoints already discovered?
-  - Technology stack? (if known)
-  - API docs / Swagger / GraphQL playgrounds?
-  - Mobile app in scope? (APK/IPA available?)
-  - WAF, rate limiting, or protections expected?
-
-📱 MOBILE SPECIFIC
-  - Is the APK/IPA obfuscated?
-  - Root detection or Jailbreak protection active?
-  - SSL pinning implemented?
-  - Minimum supported API level?
-
-⚙️ BINARY SPECIFIC
-  - Target architecture? (x86, x64, ARM)
-  - Is the binary packed or stripped?
-  - Protected by ASLR, DEP, or Stack Canaries?
-  - Remote service or local application?
-
-📄 SOURCE CODE SPECIFIC
-  - Primary languages and frameworks?
-  - CI/CD pipeline accessible?
-  - Any internal dependency management?
-  - Are SAST tool results already available?
-
-🎯 PRIORITIES & FOCUS
-  - Bug types to focus on? (IDOR, SSRF, XSS, logic flaws)
-  - Specific feature/endpoint that looks suspicious?
-  - Previous bugs found on this target?
-
-🧪 ENVIRONMENT
-  - Staging / dev environment separate from production?
-  - VPN access needed?
-  - Tools already running? (Burp, proxies, scanners)
-```
-
-**After collecting answers, save:**
+**Save format:**
 ```json
 bb_save_context({
   "program_id": <id>,
   "data": {
     "target_domains": ["app.example.com"],
     "business_context": "...",
-    "program_type": "public HackerOne",
+    "program_type": "private HackerOne",
     "credentials": {"test@example.com": "pass"},
     "auth_mechanism": "JWT",
     "tech_stack": ["React", "Node.js", "PostgreSQL"],
     "focus_areas": ["IDOR", "SSRF", "business logic"],
+    "source": "autofilled from h1-brain",
     "notes": "..."
   }
 })
 ```
+
+**Anti-pattern (DO NOT DO):**
+- ❌ "What tech stack does this program use?" when h1-brain already said "React, Node.js"
+- ❌ "What domains are in scope?" when h1-brain returned `scopes.in_scope[*].asset`
+- ❌ "Is this a private program?" when h1-brain already confirmed it
+- ❌ Asking any question where the answer is already in the data you collected
+
+**Correct behavior:**
+1. Fire `h1-brain_hack()` or Intigriti API call in parallel with Step 1-2
+2. Autofill everything possible
+3. Save context immediately
+4. Only interrupt user for credentials if empty → single question, no fanfare
 
 Never ask these questions again — always `bb_get_context` first.
 

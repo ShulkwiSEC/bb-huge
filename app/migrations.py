@@ -9,6 +9,7 @@ MIGRATION_PROGRAMS_LOGO = "20260529_programs_logo"
 MIGRATION_PROGRAM_SUMMARY = "20260611_program_summary"
 MIGRATION_FIELD_COLUMN = "20260611_field_column"
 MIGRATION_TECH_STACK = "20260612_tech_stack"
+MIGRATION_FEATURES_V3 = "20260618_features_v3"
 
 
 def run_migrations():
@@ -47,6 +48,7 @@ def _migrations():
         (MIGRATION_PROGRAM_SUMMARY, _migration_program_summary),
         (MIGRATION_FIELD_COLUMN, _migration_field_column),
         (MIGRATION_TECH_STACK, _migration_tech_stack),
+        (MIGRATION_FEATURES_V3, _migration_features_v3),
     ]
 
 
@@ -177,3 +179,99 @@ def _migration_tech_stack(conn):
         "tech_stack",
         "ALTER TABLE programs ADD COLUMN tech_stack TEXT NOT NULL DEFAULT '[]'",
     )
+
+
+def _migration_features_v3(conn):
+    inspector = inspect(conn)
+    table_names = inspector.get_table_names()
+
+    # 1. related_finding_ids on findings
+    if "findings" in table_names:
+        columns = {col["name"] for col in inspector.get_columns("findings")}
+        _add_column_if_missing(
+            conn,
+            columns,
+            "related_finding_ids",
+            "ALTER TABLE findings ADD COLUMN related_finding_ids TEXT NOT NULL DEFAULT '[]'",
+        )
+
+    # 2. credentials table
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS credentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                program_id INTEGER NOT NULL REFERENCES programs(id),
+                label VARCHAR(100) NOT NULL,
+                credential_type VARCHAR(50) NOT NULL DEFAULT 'password',
+                username_encrypted TEXT,
+                secret_encrypted TEXT NOT NULL,
+                url VARCHAR(500),
+                notes TEXT NOT NULL DEFAULT '',
+                active BOOLEAN NOT NULL DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    )
+
+    # 3. report_drafts table
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS report_drafts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                finding_id INTEGER NOT NULL REFERENCES findings(id),
+                version INTEGER NOT NULL DEFAULT 1,
+                title TEXT,
+                description TEXT NOT NULL DEFAULT '',
+                poc TEXT NOT NULL DEFAULT '',
+                summary TEXT NOT NULL DEFAULT '',
+                impact TEXT NOT NULL DEFAULT '',
+                cwe VARCHAR(50),
+                cvss FLOAT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    )
+
+    # 4. alert_rules table
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS alert_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                program_id INTEGER REFERENCES programs(id),
+                name VARCHAR(200) NOT NULL,
+                trigger_event VARCHAR(100) NOT NULL,
+                filter_expression TEXT NOT NULL DEFAULT '',
+                webhook_url TEXT NOT NULL DEFAULT '',
+                discord_channel VARCHAR(200),
+                telegram_chat_id VARCHAR(100),
+                slack_webhook_url TEXT,
+                active BOOLEAN NOT NULL DEFAULT 1,
+                last_fired_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    )
+
+    # 5. Scope versioning: add version + deprecated_at to assets
+    if "assets" in table_names:
+        columns = {col["name"] for col in inspector.get_columns("assets")}
+        _add_column_if_missing(
+            conn,
+            columns,
+            "version",
+            "ALTER TABLE assets ADD COLUMN version INTEGER NOT NULL DEFAULT 1",
+        )
+        _add_column_if_missing(
+            conn,
+            columns,
+            "deprecated_at",
+            "ALTER TABLE assets ADD COLUMN deprecated_at DATETIME",
+        )

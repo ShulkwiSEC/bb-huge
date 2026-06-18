@@ -451,6 +451,7 @@ class Finding(db.Model):
     description = db.Column(db.Text, nullable=False, default="")
     poc = db.Column(db.Text, nullable=False, default="")
     _tags = db.Column("tags", db.Text, nullable=False, default="[]")
+    _related_finding_ids = db.Column("related_finding_ids", db.Text, nullable=False, default="[]")
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
@@ -485,6 +486,14 @@ class Finding(db.Model):
             value = [tag.strip() for tag in value.split(",") if tag.strip()]
         self._tags = _dump_json(value, [])
 
+    @property
+    def related_finding_ids(self):
+        return _load_json(self._related_finding_ids, [])
+
+    @related_finding_ids.setter
+    def related_finding_ids(self, value):
+        self._related_finding_ids = _dump_json(value if isinstance(value, list) else [], [])
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -503,6 +512,7 @@ class Finding(db.Model):
             "description": self.description,
             "poc": self.poc,
             "tags": self.tags,
+            "related_finding_ids": self.related_finding_ids,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "attachments": [attachment.to_dict() for attachment in self.attachments],
@@ -572,6 +582,8 @@ class Asset(db.Model):
     environment = db.Column(db.String(20), nullable=False, default="unknown")
     notes = db.Column(db.Text, nullable=False, default="")
     active = db.Column(db.Boolean, nullable=False, default=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
+    deprecated_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
@@ -589,6 +601,8 @@ class Asset(db.Model):
             "environment": self.environment,
             "notes": self.notes,
             "active": self.active,
+            "version": self.version,
+            "deprecated_at": self.deprecated_at.isoformat() if self.deprecated_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -643,4 +657,110 @@ class Attachment(db.Model):
             "original_name": self.original_name,
             "path": self.path,
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
+        }
+
+
+class Credential(db.Model):
+    __tablename__ = "credentials"
+
+    id = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey("programs.id"), nullable=False)
+    label = db.Column(db.String(100), nullable=False)
+    credential_type = db.Column(db.String(50), nullable=False, default="password")
+    username_encrypted = db.Column(db.Text, nullable=True)
+    secret_encrypted = db.Column(db.Text, nullable=False)
+    url = db.Column(db.String(500), nullable=True)
+    notes = db.Column(db.Text, nullable=False, default="")
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
+
+    program = db.relationship("Program", backref=db.backref("credentials", lazy=True, cascade="all, delete-orphan"))
+
+    def to_dict(self, include_secret=False):
+        result = {
+            "id": self.id,
+            "program_id": self.program_id,
+            "label": self.label,
+            "credential_type": self.credential_type,
+            "url": self.url,
+            "notes": self.notes,
+            "active": self.active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+        if include_secret:
+            result["username_encrypted"] = self.username_encrypted
+            result["secret_encrypted"] = self.secret_encrypted
+        return result
+
+
+class ReportDraft(db.Model):
+    __tablename__ = "report_drafts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    finding_id = db.Column(db.Integer, db.ForeignKey("findings.id"), nullable=False)
+    version = db.Column(db.Integer, nullable=False, default=1)
+    title = db.Column(db.String(300), nullable=True)
+    description = db.Column(db.Text, nullable=False, default="")
+    poc = db.Column(db.Text, nullable=False, default="")
+    summary = db.Column(db.Text, nullable=False, default="")
+    impact = db.Column(db.Text, nullable=False, default="")
+    cwe = db.Column(db.String(50), nullable=True)
+    cvss = db.Column(db.Float, nullable=True)
+    created_at = db.Column(db.DateTime, default=_now)
+
+    finding = db.relationship("Finding", backref=db.backref("report_drafts", lazy=True, cascade="all, delete-orphan",
+                                                            order_by="ReportDraft.version.desc()"))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "finding_id": self.finding_id,
+            "version": self.version,
+            "title": self.title,
+            "description": self.description,
+            "poc": self.poc,
+            "summary": self.summary,
+            "impact": self.impact,
+            "cwe": self.cwe,
+            "cvss": self.cvss,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AlertRule(db.Model):
+    __tablename__ = "alert_rules"
+
+    id = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey("programs.id"), nullable=True)
+    name = db.Column(db.String(200), nullable=False)
+    trigger_event = db.Column(db.String(100), nullable=False)
+    filter_expression = db.Column(db.Text, nullable=False, default="")
+    webhook_url = db.Column(db.Text, nullable=True)
+    discord_channel = db.Column(db.String(200), nullable=True)
+    telegram_chat_id = db.Column(db.String(100), nullable=True)
+    slack_webhook_url = db.Column(db.Text, nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    last_fired_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
+
+    program = db.relationship("Program", backref=db.backref("alert_rules", lazy=True, cascade="all, delete-orphan"))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "program_id": self.program_id,
+            "name": self.name,
+            "trigger_event": self.trigger_event,
+            "filter_expression": self.filter_expression,
+            "webhook_url": self.webhook_url,
+            "discord_channel": self.discord_channel,
+            "telegram_chat_id": self.telegram_chat_id,
+            "slack_webhook_url": self.slack_webhook_url,
+            "active": self.active,
+            "last_fired_at": self.last_fired_at.isoformat() if self.last_fired_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
