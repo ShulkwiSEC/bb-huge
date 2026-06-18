@@ -8,7 +8,8 @@ description: >
   "mark as rewarded", "setup workspace", "pull evidence", "continue working on
   finding", "dump attachments", "list my skills", "what skills do I have",
   "/bb-huge init", "init hunt workspace", "new bug bounty program", "start hunting",
-  "mobile bug bounty", "binary analysis", "source code review", "white-box audit".
+  "mobile bug bounty", "binary analysis", "source code review", "white-box audit",
+  "h1-brain", "hack program", "hack()", "search disclosed", "fetch rewarded".
   Also auto-activates whenever a vulnerability is discovered during any recon,
   fuzzing, or manual testing session — do not wait to be asked.
 ---

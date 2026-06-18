@@ -50,6 +50,18 @@
       ],
       "enabled": true
     },
+    "h1-brain": {
+      "type": "local",
+      "command": [
+        "python3",
+        "/mnt/d/Tools/h1-brain/server.py"
+      ],
+      "environment": {
+        "H1_USERNAME": "YOUR_HACKERONE_USERNAME",
+        "H1_API_TOKEN": "YOUR_HACKERONE_API_TOKEN"
+      },
+      "enabled": true
+    },
     "bugbounty-mcp": {
       "type": "local",
       "command": [
