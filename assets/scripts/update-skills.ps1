@@ -13,6 +13,9 @@ $targetDirs = @(
     "$HOME\.skillz\skills\bb-huge",
     "$HOME\.opencode\skills\bb-huge",
     "$HOME\.antigravity\skills\bb-huge"
+    "$HOME\.agents\skills\"
+    "$HOME\.skills\"
+    "$HOME\.skillz\"
 )
 
 Write-Host "$([char]0x2705) Syncing bb-huge skill to all agents..." -ForegroundColor Cyan

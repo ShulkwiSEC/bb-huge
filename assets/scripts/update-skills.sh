@@ -12,6 +12,9 @@ TARGET_DIRS=(
   "$HOME/.skillz/skills/bb-huge"
   "$HOME/.opencode/skills/bb-huge"
   "$HOME/.antigravity/skills/bb-huge"
+  "$HOME/.agents/skills/"
+  "$HOME/.skills/"
+  "$HOME/.skillz/"
 )
 
 echo "🚀 Syncing bb-huge skill to all agents..."
