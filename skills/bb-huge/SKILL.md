@@ -683,14 +683,19 @@ Never ask these questions again — always `bb_get_context` first.
 
 1. `bb_generate_report_context(finding_id)` — full report pack.
 2. Fill unresolved gaps (CWE, CVSS, PoC, evidence).
-3. **Route by Field**:
-   - **Web**: Load `references/bb-report-templates.md`.
+3. **Determine Platform** from `program.platform`:
+   - **Intigriti**: Load `references/intigriti-report-writing.md` + `references/bb-report-templates.md`.
+   - **HackerOne**: Load `references/hackerone-report-writing.md` + `references/bb-report-templates.md`.
+   - **Bugcrowd / YesWeHack / Other**: Load `references/generic-report-writing.md` + `references/bb-report-templates.md`.
+4. **Route by Field** for template:
+   - **Web**: Use `references/bb-report-templates.md` for vuln-type template.
    - **Mobile**: Load `references/mobile-report-templates.md`.
    - **Binary**: Load `references/binary-report-templates.md`.
    - **Source Code**: Load `references/source-code-report-templates.md`.
-4. Write the report using the matching template for the vuln type.
-5. Submit to platform.
-6. `bb_update_status() → reported`.
+5. Write the report matching the platform's submission format (structured fields vs free-text).
+6. **Run pre-submit checklist** from the platform-specific guide.
+7. Submit to platform (or hand off to user if no submit tool available).
+8. `bb_update_status() → reported`.
 
 ---
 
@@ -869,6 +874,9 @@ Load **only what you need** for the current task:
 | `references/bb-operator.md` | Hunting methodology, session structure, field-specific patterns |
 | `references/bb-recon.md` | Recon phase — subdomain enum, fingerprinting, JS analysis |
 | `references/bb-report-templates.md` | Writing reports — templates for XSS, IDOR, SSRF, SQLi |
+| `references/intigriti-report-writing.md` | Intigriti platform submission — structured form fields, CVSS calculator, scope validation assistant, triage lifecycle |
+| `references/hackerone-report-writing.md` | HackerOne platform submission — title format, steps to reproduce, quality standards, common mistakes |
+| `references/generic-report-writing.md` | Platform-agnostic report writing — universal structure, evidence rules, CVSS reference, pre-submit checklist |
 | `references/opencode-browser.md` | Browser automation — full plugin guide, configuration, and bug bounty usage |
 | `references/im-scheduled.md` | Scheduled/automated missions only |
 | `references/magic-context.md` | Agent memory — use `ctx_memory` to persist recon facts, technique patterns, scope constraints, and dead-ends across sessions; use `ctx_search` at session start to recall all prior knowledge before testing |
