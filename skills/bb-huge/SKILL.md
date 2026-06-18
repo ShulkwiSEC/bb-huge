@@ -693,6 +693,65 @@ Never ask these questions again — always `bb_get_context` first.
 
 ---
 
+## Browser Automation (opencode-browser plugin)
+
+When you need to interact with a target web app directly — navigate pages,
+fill forms, click elements, extract DOM content, or screenshot responses —
+use the **opencode-browser** plugin. It replaces both Playwright MCP and
+mitmproxy MCP with a single Chrome/Edge extension-based integration.
+
+**Full reference:** `references/opencode-browser.md`
+
+### When to use the browser
+
+| Task | Use browser? |
+|------|-------------|
+| Navigate to a URL and inspect the rendered page | ✅ Yes |
+| Fill and submit a login form | ✅ Yes |
+| Click through a multi-step flow (checkout, OAuth, wizard) | ✅ Yes |
+| Screenshot a response or DOM state as evidence | ✅ Yes |
+| Extract content from a rendered SPA / JS-heavy page | ✅ Yes |
+| Raw HTTP request testable with curl/ffuf | ⚡ Either — prefer curl for speed |
+
+### How it works
+
+The plugin runs inside OpenCode natively. It connects to your Chrome/Edge
+browser via the Browser MCP extension (must be installed and enabled —
+install from `https://browsermcp.io/install`). Describe what to do in plain
+language and the model drives the browser through MCP tool calls. No
+Playwright process, no mitmproxy daemon — just the extension.
+
+### Bug bounty browser workflow
+
+```
+1. Navigate directly to the target URL — always use the full URL, never
+   click through intermediate pages when the destination is known.
+2. Authenticate if needed — fill the login form or inject a session cookie.
+3. Perform the test action (tamper a parameter, submit a payload, change a
+   request field).
+4. Screenshot or snapshot the response as evidence.
+5. Attach evidence immediately → bb_attach_http_pair or bb_upload_attachment.
+6. Log the finding to bb-huge before moving to the next test.
+```
+
+### Performance rules
+
+- **Prefer `navigate` over clicking** when you know the destination URL.
+- **Minimize snapshots/screenshots** — only capture when evidence is needed.
+- **Reuse current tab and page state** — don't re-navigate if already there.
+- **Use targeted extraction** instead of full-page snapshots.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Browser tools not available | Restart OpenCode after adding MCP config to `opencode.json` |
+| Connection lost mid-session | Re-enable Browser MCP extension in Chrome, retry immediately (no wait needed) |
+| Extension not connecting | Ensure Chrome/Edge is running with the extension enabled |
+| Tools globally disabled | Check `opencode.json` — verify `browsermcp_*` is not set to `false` |
+
+---
+
 ## Script Utilities
 
 | Script | Invocation | Purpose |
@@ -809,6 +868,7 @@ Load **only what you need** for the current task:
 | `references/bb-operator.md` | Hunting methodology, session structure, field-specific patterns |
 | `references/bb-recon.md` | Recon phase — subdomain enum, fingerprinting, JS analysis |
 | `references/bb-report-templates.md` | Writing reports — templates for XSS, IDOR, SSRF, SQLi |
+| `references/opencode-browser.md` | Browser automation — full plugin guide, configuration, and bug bounty usage |
 | `references/im-scheduled.md` | Scheduled/automated missions only |
 
 ---

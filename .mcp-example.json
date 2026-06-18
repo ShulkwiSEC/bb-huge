@@ -1,0 +1,67 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "bb-huge": {
+      "type": "local",
+      "command": [
+        "python3",
+        "/mnt/c/Users/shulkwi/Desktop/Work/bb-huge/bb-huge/mcp_server.py"
+      ],
+      "environment": {
+        "DEV_KEY": "shulkwisec_123",
+        "BB_HUGE_URL": "http://127.0.0.1:5000"
+      },
+      "enabled": true
+    },
+    "intigriti": {
+      "type": "local",
+      "command": [
+        "python3",
+        "/mnt/d/Tools/mcp-intigriti-server/server.py"
+      ],
+      "environment": {
+        "INTIGRITI_API_TOKEN": "<PUT YOUR INTIGRITI API_TOKEN>"
+      },
+      "enabled": true
+    },
+    "browsermcp": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@browsermcp/mcp@0.1.3"
+      ],
+      "enabled": true
+    },
+    "hackerone-mcp": {
+      "type": "local",
+      "command": [
+        "bash",
+        "-c",
+        "node /mnt/d/Tools/hackerone-mcp-server/dist/index.js"
+      ],
+      "enabled": true
+    },
+    "hacktricks": {
+      "type": "local",
+      "command": [
+        "npx",
+        "hacktricks-mcp-server"
+      ],
+      "enabled": true
+    },
+    "bugbounty-mcp": {
+      "type": "local",
+      "command": [
+        "bash",
+        "-c",
+        "cd /mnt/d/Tools/bb-huge-setup-bug-hunter-toolkit/gokulapap-bugbounty-mcp && /home/shulkwisec/.local/bin/bugbounty-mcp serve | grep --line-buffered '^{'"
+      ],
+      "enabled": true
+    }
+  },
+  "plugin": [
+    "oh-my-openagent@latest",
+    "opencode-browser"
+  ]
+}
