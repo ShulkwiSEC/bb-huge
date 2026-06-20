@@ -197,8 +197,6 @@ def list_findings():
 
 
 # ── Detail ────────────────────────────────────────────────────────────────────
-
-
 @findings_bp.route("/findings/<int:fid>")
 @login_required
 def detail(fid):
@@ -215,6 +213,47 @@ def detail(fid):
         related_work=related_work,
     )
 
+@findings_bp.route("/findings/<int:fid>/share", methods=["POST"])
+@login_required
+def share_finding(fid):
+    finding = Finding.query.get_or_404(fid)
+
+    passphrase = request.form.get("passphrase", "").strip() or None
+    expiration = request.form.get("expiration", "1week")
+    burn_after_reading = request.form.get("burn_after_reading") == "true"
+
+    raw_content = finding.description or ""
+    if finding.poc:
+        raw_content += f"\n\n{finding.poc}"
+
+    markdown_content = raw_content + "\n\n> **→ [bb-huge GitHub](https://github.com/ShulkwiSEC/bb-huge)** · Built by [@ShulkwiSEC](https://github.com/ShulkwiSEC)"
+
+    import privatebinapi
+    try:
+        res = privatebinapi.send(
+            "https://privatebin.net/",
+            text=markdown_content,
+            password=passphrase,
+            expiration=expiration,
+            formatting="markdown",
+            burn_after_reading=burn_after_reading
+        )
+        if res and "full_url" in res:
+            return jsonify({
+                "success": True,
+                "url": res["full_url"],
+                "passphrase": passphrase
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to retrieve URL from PrivateBin response"
+            }), 400
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 # ── Add ───────────────────────────────────────────────────────────────────────
 

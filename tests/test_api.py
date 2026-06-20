@@ -165,6 +165,60 @@ class V2ApiTests(unittest.TestCase):
         self.assertEqual(report_json["finding"]["id"], finding["id"])
         self.assertEqual(len(report_json["evidence_summary"]["finding_evidence"]), 1)
 
+    def test_share_finding(self):
+        # Create a program and finding
+        program = self._post_json("/api/v1/programs", {"name": "Test Share Prog"}).get_json()
+        pid = program["id"]
+        finding = self._post_json(
+            "/api/v1/findings",
+            {
+                "program_id": pid,
+                "title": "SQL Injection in Search",
+                "target": "api.example.test",
+                "severity": "critical",
+                "status": "confirmed",
+                "description": "Exploit with sqlmap",
+                "poc": "sqlmap -u ...",
+            },
+        ).get_json()
+        fid = finding["id"]
+
+        # Authenticate session
+        with self.client.session_transaction() as sess:
+            sess["authenticated"] = True
+
+        # Mock privatebinapi.send
+        from unittest.mock import patch
+        mock_response = {
+            "full_url": "https://privatebin.net/?testslug#key"
+        }
+
+        with patch("privatebinapi.send", return_value=mock_response) as mock_send:
+            res = self.client.post(
+                f"/findings/{fid}/share",
+                data={
+                    "passphrase": "test-password",
+                    "expiration": "1week",
+                    "burn_after_reading": "false"
+                }
+            )
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertTrue(data["success"])
+            self.assertEqual(data["url"], "https://privatebin.net/?testslug#key")
+            self.assertEqual(data["passphrase"], "test-password")
+
+            # Check that mock_send was called with the right data
+            mock_send.assert_called_once_with(
+                "https://privatebin.net/",
+                text=mock_send.call_args[1]["text"],
+                password="test-password",
+                expiration="1week",
+                formatting="markdown",
+                burn_after_reading=False
+            )
+            self.assertIn("# Security Research Report — SQL Injection in Search", mock_send.call_args[1]["text"])
+
 
 if __name__ == "__main__":
     unittest.main()
