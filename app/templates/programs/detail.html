@@ -709,24 +709,29 @@
               <span class="tiny">created {{ asset.created_at.strftime('%Y-%m-%d') if asset.created_at }}</span>
             </div>
 
-            <!-- Endpoints for this asset -->
+            <!-- Endpoints for this asset — collapsed by default, bulk gau/katana
+                 imports can land hundreds per asset and would otherwise blow up
+                 the card's height. -->
             <div style="margin-top:10px">
               {% if asset.endpoints %}
-                <div style="display:grid;gap:4px">
-                  {% for ep in asset.endpoints %}
-                    <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;font-family:var(--mono)">
-                      <span class="brief-chip" style="font-size:10px">{{ ep.method }}</span>
-                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ep.path }}</span>
-                      <span class="tiny">{{ ep.protocol }}</span>
-                      {% if ep.content_type %}<span class="tiny">{{ ep.content_type }}</span>{% endif %}
-                      {% if ep.auth_required is not none %}<span class="tiny">{{ 'auth' if ep.auth_required else 'public' }}</span>{% endif %}
-                      {% if ep.discovered_by %}<span class="tiny">via {{ ep.discovered_by }}</span>{% endif %}
-                      <form method="POST" action="{{ url_for('programs.delete_endpoint', eid=ep.id) }}" style="display:inline" onsubmit="return confirm('Delete endpoint?')">
-                        <button type="submit" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px" title="Delete endpoint">✕</button>
-                      </form>
-                    </div>
-                  {% endfor %}
-                </div>
+                <details>
+                  <summary style="font-size:11px;color:var(--muted);cursor:pointer">Endpoints ({{ asset.endpoints|length }})</summary>
+                  <div style="display:grid;gap:4px;margin-top:6px;max-height:340px;overflow-y:auto">
+                    {% for ep in asset.endpoints %}
+                      <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;font-family:var(--mono)">
+                        <span class="brief-chip" style="font-size:10px">{{ ep.method }}</span>
+                        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ep.path }}</span>
+                        <span class="tiny">{{ ep.protocol }}</span>
+                        {% if ep.content_type %}<span class="tiny">{{ ep.content_type }}</span>{% endif %}
+                        {% if ep.auth_required is not none %}<span class="tiny">{{ 'auth' if ep.auth_required else 'public' }}</span>{% endif %}
+                        {% if ep.discovered_by %}<span class="tiny">via {{ ep.discovered_by }}</span>{% endif %}
+                        <form method="POST" action="{{ url_for('programs.delete_endpoint', eid=ep.id) }}" style="display:inline" onsubmit="return confirm('Delete endpoint?')">
+                          <button type="submit" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px" title="Delete endpoint">✕</button>
+                        </form>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </details>
               {% endif %}
 
               <!-- Add endpoint form -->
