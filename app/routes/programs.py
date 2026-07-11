@@ -1,6 +1,7 @@
+import threading
 from datetime import datetime, timezone
 from flask import (Blueprint, render_template, request, redirect,
-                   url_for, flash)
+                   url_for, flash, current_app, jsonify)
 from .. import db
 from ..models import (
     ASSET_ENVIRONMENTS,
@@ -23,8 +24,10 @@ from ..models import (
     Observation,
     Program,
     ReconEntry,
+    ReconJob,
     TargetContext,
 )
+from ..recon_runner import run_recon_job
 from .auth import login_required
 
 programs_bp = Blueprint("programs", __name__)
@@ -75,6 +78,13 @@ def detail(pid):
         .all()
     )
     target_context = TargetContext.query.filter_by(program_id=pid).first()
+    recon_jobs = (
+        ReconJob.query.filter_by(program_id=pid)
+        .order_by(ReconJob.started_at.desc())
+        .limit(50)
+        .all()
+    )
+    recon_job = recon_jobs[0] if recon_jobs else None
 
     # Group recon by category
     recon_grouped = {}
@@ -109,6 +119,8 @@ def detail(pid):
         hypotheses=hypotheses,
         evidence_records=evidence_records,
         target_context=target_context,
+        recon_job=recon_job,
+        recon_jobs=recon_jobs,
         duplicate_hotspots=duplicate_hotspots,
         recon_grouped=recon_grouped,
         recon_categories=RECON_CATEGORIES,
@@ -196,6 +208,50 @@ def delete_program(pid):
     db.session.commit()
     flash("Program deleted.", "info")
     return redirect(url_for("programs.list_programs"))
+
+
+# ── Restart Automatic Scripts (Danger Zone) ───────────────────────────────────
+#
+# Re-runs subfinder + gau against this program's domain assets and imports
+# fresh recon data in the background. Session-authed like every other page
+# on this blueprint, but re-asks for the dev key anyway since this is an
+# expensive, running-in-the-background action, not a quick edit.
+
+@programs_bp.route("/programs/<int:pid>/scripts/restart", methods=["POST"])
+@login_required
+def restart_scripts(pid):
+    Program.query.get_or_404(pid)
+
+    confirm_key = request.form.get("confirm_key", "")
+    if confirm_key != current_app.config["DEV_KEY"]:
+        flash("Incorrect key — scripts not restarted.", "error")
+        return redirect(url_for("programs.detail", pid=pid) + "#logs")
+
+    already_running = ReconJob.query.filter_by(program_id=pid, status="running").first()
+    if already_running:
+        flash("A recon job is already running for this program — wait for it to finish.", "error")
+        return redirect(url_for("programs.detail", pid=pid) + "#logs")
+
+    job = ReconJob(program_id=pid, status="running", triggered_by="web-ui")
+    db.session.add(job)
+    db.session.commit()
+
+    app_obj = current_app._get_current_object()
+    threading.Thread(target=run_recon_job, args=(app_obj, job.id), daemon=True).start()
+
+    flash("Automatic scripts restarted — running in the background.", "info")
+    return redirect(url_for("programs.detail", pid=pid) + "#logs")
+
+
+@programs_bp.route("/programs/<int:pid>/scripts/status")
+@login_required
+def scripts_status(pid):
+    job = (
+        ReconJob.query.filter_by(program_id=pid)
+        .order_by(ReconJob.started_at.desc())
+        .first()
+    )
+    return jsonify(job.to_dict() if job else {"status": "never_run"})
 
 
 # ── Recon: Add ────────────────────────────────────────────────────────────────

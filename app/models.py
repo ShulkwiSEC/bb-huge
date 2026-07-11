@@ -353,6 +353,8 @@ class Observation(db.Model):
     agent = db.Column(db.String(50), nullable=False, default="manual")
     source_tool = db.Column(db.String(100), nullable=True)
     confidence = db.Column(db.String(20), nullable=False, default="medium")
+    claimed_by = db.Column(db.String(50), nullable=True)
+    claimed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
@@ -375,6 +377,8 @@ class Observation(db.Model):
             "agent": self.agent,
             "source_tool": self.source_tool,
             "confidence": self.confidence,
+            "claimed_by": self.claimed_by,
+            "claimed_at": self.claimed_at.isoformat() if self.claimed_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -397,6 +401,8 @@ class Hypothesis(db.Model):
     status = db.Column(db.String(20), nullable=False, default="open")
     agent = db.Column(db.String(50), nullable=False, default="manual")
     confidence = db.Column(db.String(20), nullable=False, default="medium")
+    claimed_by = db.Column(db.String(50), nullable=True)
+    claimed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
@@ -425,6 +431,8 @@ class Hypothesis(db.Model):
             "status": self.status,
             "agent": self.agent,
             "confidence": self.confidence,
+            "claimed_by": self.claimed_by,
+            "claimed_at": self.claimed_at.isoformat() if self.claimed_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -452,6 +460,8 @@ class Finding(db.Model):
     poc = db.Column(db.Text, nullable=False, default="")
     _tags = db.Column("tags", db.Text, nullable=False, default="[]")
     _related_finding_ids = db.Column("related_finding_ids", db.Text, nullable=False, default="[]")
+    claimed_by = db.Column(db.String(50), nullable=True)
+    claimed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
@@ -513,6 +523,8 @@ class Finding(db.Model):
             "poc": self.poc,
             "tags": self.tags,
             "related_finding_ids": self.related_finding_ids,
+            "claimed_by": self.claimed_by,
+            "claimed_at": self.claimed_at.isoformat() if self.claimed_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "attachments": [attachment.to_dict() for attachment in self.attachments],
@@ -693,6 +705,93 @@ class Credential(db.Model):
             result["username_encrypted"] = self.username_encrypted
             result["secret_encrypted"] = self.secret_encrypted
         return result
+
+
+AUTH_SESSION_TYPES = ["cookie", "bearer", "custom_header", "mixed"]
+AUTH_SESSION_STATUSES = ["active", "expired", "invalid"]
+
+
+class AuthSession(db.Model):
+    """A captured, reusable authenticated session (cookies/headers) for a
+    program + identity label. Populated by the HAR importer once someone
+    logs in via a real browser; consumed by any agent via bb_get_session
+    so it never has to handle login/MFA/CSRF itself."""
+
+    __tablename__ = "auth_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey("programs.id"), nullable=False)
+    label = db.Column(db.String(100), nullable=False, default="default")
+    base_url = db.Column(db.String(500), nullable=True)
+    auth_type = db.Column(db.String(50), nullable=False, default="cookie")
+    cookies_encrypted = db.Column(db.Text, nullable=True)
+    headers_encrypted = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="active")
+    captured_by = db.Column(db.String(100), nullable=True)
+    source = db.Column(db.String(50), nullable=False, default="har_import")
+    captured_at = db.Column(db.DateTime, default=_now)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
+
+    program = db.relationship("Program", backref=db.backref("auth_sessions", lazy=True, cascade="all, delete-orphan"))
+
+    def to_dict(self, include_secret=False):
+        result = {
+            "id": self.id,
+            "program_id": self.program_id,
+            "label": self.label,
+            "base_url": self.base_url,
+            "auth_type": self.auth_type,
+            "status": self.status,
+            "captured_by": self.captured_by,
+            "source": self.source,
+            "captured_at": self.captured_at.isoformat() if self.captured_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "notes": self.notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+        if include_secret:
+            result["cookies"] = _load_json(self.cookies_encrypted, None)
+            result["headers"] = _load_json(self.headers_encrypted, None)
+        return result
+
+
+RECON_JOB_STATUSES = ["running", "completed", "completed_with_errors", "failed"]
+
+
+class ReconJob(db.Model):
+    """One row per 'Restart Automatic Scripts' run — tracks the background
+    subfinder/gau pipeline triggered from the program Danger Zone. Only one
+    running job per program is allowed at a time (enforced in the route,
+    not here)."""
+
+    __tablename__ = "recon_jobs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey("programs.id"), nullable=False)
+    status = db.Column(db.String(30), nullable=False, default="running")
+    triggered_by = db.Column(db.String(100), nullable=True)
+    summary = db.Column(db.Text, nullable=False, default="")
+    error = db.Column(db.Text, nullable=True)
+    started_at = db.Column(db.DateTime, default=_now)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    program = db.relationship("Program", backref=db.backref("recon_jobs", lazy=True, cascade="all, delete-orphan"))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "program_id": self.program_id,
+            "status": self.status,
+            "triggered_by": self.triggered_by,
+            "summary": self.summary,
+            "error": self.error,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+        }
 
 
 class ReportDraft(db.Model):

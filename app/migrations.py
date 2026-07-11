@@ -10,6 +10,9 @@ MIGRATION_PROGRAM_SUMMARY = "20260611_program_summary"
 MIGRATION_FIELD_COLUMN = "20260611_field_column"
 MIGRATION_TECH_STACK = "20260612_tech_stack"
 MIGRATION_FEATURES_V3 = "20260618_features_v3"
+MIGRATION_WORK_QUEUE = "20260710_work_queue"
+MIGRATION_AUTH_SESSIONS = "20260711_auth_sessions"
+MIGRATION_RECON_JOBS = "20260711_recon_jobs"
 
 
 def run_migrations():
@@ -49,6 +52,9 @@ def _migrations():
         (MIGRATION_FIELD_COLUMN, _migration_field_column),
         (MIGRATION_TECH_STACK, _migration_tech_stack),
         (MIGRATION_FEATURES_V3, _migration_features_v3),
+        (MIGRATION_WORK_QUEUE, _migration_work_queue),
+        (MIGRATION_AUTH_SESSIONS, _migration_auth_sessions),
+        (MIGRATION_RECON_JOBS, _migration_recon_jobs),
     ]
 
 
@@ -275,3 +281,83 @@ def _migration_features_v3(conn):
             "deprecated_at",
             "ALTER TABLE assets ADD COLUMN deprecated_at DATETIME",
         )
+
+
+def _migration_work_queue(conn):
+    """Claim fields for multi-agent orchestration's work-queue endpoints."""
+    inspector = inspect(conn)
+    table_names = inspector.get_table_names()
+
+    for table in ("observations", "hypotheses", "findings"):
+        if table not in table_names:
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        _add_column_if_missing(
+            conn,
+            columns,
+            "claimed_by",
+            f"ALTER TABLE {table} ADD COLUMN claimed_by VARCHAR(50)",
+        )
+        _add_column_if_missing(
+            conn,
+            columns,
+            "claimed_at",
+            f"ALTER TABLE {table} ADD COLUMN claimed_at DATETIME",
+        )
+
+
+def _migration_auth_sessions(conn):
+    """Reusable captured authenticated sessions (cookies/headers), one per
+    (program_id, label), populated by the HAR importer."""
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                program_id INTEGER NOT NULL REFERENCES programs(id),
+                label VARCHAR(100) NOT NULL DEFAULT 'default',
+                base_url VARCHAR(500),
+                auth_type VARCHAR(50) NOT NULL DEFAULT 'cookie',
+                cookies_encrypted TEXT,
+                headers_encrypted TEXT,
+                status VARCHAR(20) NOT NULL DEFAULT 'active',
+                captured_by VARCHAR(100),
+                source VARCHAR(50) NOT NULL DEFAULT 'har_import',
+                captured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at DATETIME,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    )
+    conn.execute(
+        text(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_auth_sessions_program_label
+            ON auth_sessions (program_id, label)
+            """
+        )
+    )
+
+
+def _migration_recon_jobs(conn):
+    """Tracks background 'Restart Automatic Scripts' runs (subfinder/gau
+    pipeline triggered from the program Danger Zone)."""
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS recon_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                program_id INTEGER NOT NULL REFERENCES programs(id),
+                status VARCHAR(30) NOT NULL DEFAULT 'running',
+                triggered_by VARCHAR(100),
+                summary TEXT NOT NULL DEFAULT '',
+                error TEXT,
+                started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                finished_at DATETIME
+            )
+            """
+        )
+    )

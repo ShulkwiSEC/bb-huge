@@ -1261,6 +1261,202 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "bb_get_next_work_item",
+        "description": (
+            "Get the oldest unclaimed, ready work item for multi-agent orchestration. "
+            "kind='triage' -> Observation ready to enrich/promote; "
+            "kind='validate' -> Hypothesis ready for a validator subagent; "
+            "kind='report' -> confirmed Finding ready for a report-writer subagent. "
+            "See bb-multiagent-orchestration.md for the full coordinator loop."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+                "kind": {"type": "string", "enum": ["triage", "validate", "report"]},
+                "program_id": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_claim_work_item",
+        "description": "Atomically claim a work item before dispatching a subagent for it. Returns 409-style error if already claimed by someone else.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["kind", "id", "claimed_by"],
+            "properties": {
+                "kind": {"type": "string", "enum": ["triage", "validate", "report"]},
+                "id": {"type": "integer"},
+                "claimed_by": {"type": "string", "description": "Identifier for the coordinator/subagent claiming this item"},
+            },
+        },
+    },
+    {
+        "name": "bb_release_work_item",
+        "description": "Release a claimed work item (e.g. after a dispatched subagent failed or timed out) so it becomes claimable again.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["kind", "id"],
+            "properties": {
+                "kind": {"type": "string", "enum": ["triage", "validate", "report"]},
+                "id": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_save_session",
+        "description": "Save/refresh a captured authenticated session (cookies + headers) for a program + identity label. Called by bb-import-har.py after a HAR import, or directly if you captured a session another way. Upserts by (program_id, label).",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "label": {"type": "string", "description": "Identity label, e.g. user_a, user_b, admin. Defaults to 'default'."},
+                "base_url": {"type": "string"},
+                "auth_type": {"type": "string", "enum": ["cookie", "bearer", "custom_header", "mixed"]},
+                "cookies": {"type": "object", "description": "Cookie name/value map"},
+                "headers": {"type": "object", "description": "Auth-relevant headers, e.g. Authorization, CSRF token header"},
+                "captured_by": {"type": "string"},
+                "source": {"type": "string"},
+                "notes": {"type": "string"},
+                "expires_at": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "bb_get_session",
+        "description": "Get a ready-to-use captured session (real cookies/headers) for a program + identity label, instead of handling login/MFA/CSRF yourself. This is what any dispatched subagent or curl-based test should call before making authenticated requests.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "label": {"type": "string", "description": "Identity label. Defaults to 'default'."},
+            },
+        },
+    },
+    {
+        "name": "bb_list_sessions",
+        "description": "List captured sessions for a program (labels + metadata only — cookies/headers not exposed unless include_secret=true).",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "include_secret": {"type": "boolean"},
+            },
+        },
+    },
+    {
+        "name": "bb_update_session",
+        "description": "Update a captured session — e.g. mark status=invalid after a 401/redirect-to-login so the next consumer knows to ask for a fresh HAR import instead of testing unauthenticated.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+                "status": {"type": "string", "enum": ["active", "expired", "invalid"]},
+                "base_url": {"type": "string"},
+                "cookies": {"type": "object"},
+                "headers": {"type": "object"},
+                "notes": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "bb_delete_session",
+        "description": "Delete a captured session.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {"id": {"type": "integer"}},
+        },
+    },
+    {
+        "name": "bb_batch_add_recon",
+        "description": "Bulk-import recon entries (subdomains, params, tech, etc.) from external tool output in one call. Skips entries that duplicate an existing (program_id, category, value) row instead of erroring. Use instead of many bb_add_recon calls.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "entries"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["value"],
+                        "properties": {
+                            "category": {
+                                "type": "string",
+                                "enum": ["subdomain", "endpoint", "technology", "parameter", "credential", "ip", "other"],
+                            },
+                            "value": {"type": "string"},
+                            "notes": {"type": "string"},
+                            "source": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_batch_add_endpoints",
+        "description": "Bulk-import endpoints from external tool output (katana/gau/waybackurls-style URL lists) in one call. Auto-creates the parent Asset by identifier (hostname) if it does not already exist. Skips entries that duplicate an existing (asset, method, path) row. Use instead of many bb_add_endpoint calls.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id", "endpoints"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "default_asset_kind": {
+                    "type": "string",
+                    "enum": ["domain", "subdomain", "api_host", "mobile_app", "binary", "source_repo", "repo", "other"],
+                    "description": "Kind to use for any auto-created Asset (default: subdomain)",
+                },
+                "endpoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["identifier", "path"],
+                        "properties": {
+                            "identifier": {"type": "string", "description": "Hostname this endpoint belongs to"},
+                            "path": {"type": "string"},
+                            "method": {"type": "string"},
+                            "protocol": {"type": "string", "enum": ["http", "https", "graphql", "ws", "wss", "other"]},
+                            "content_type": {"type": "string"},
+                            "auth_required": {"type": "boolean"},
+                            "discovered_by": {"type": "string"},
+                            "notes": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
+    },
+    {
+        "name": "bb_search_endpoints",
+        "description": "Search endpoints across every asset in a program (path substring + optional method filter), bounded by limit/offset. Use this instead of dumping the full endpoint table — always filter/paginate on large recon datasets.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {
+                "program_id": {"type": "integer"},
+                "q": {"type": "string", "description": "Substring to match against endpoint path"},
+                "method": {"type": "string"},
+                "limit": {"type": "integer", "description": "Default 50, max 200"},
+                "offset": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "bb_get_recon_summary",
+        "description": "Counts only (recon by category, assets by kind, endpoints by method) for a program — the shape of the haystack. Call this before deciding what to search for, instead of listing everything.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["program_id"],
+            "properties": {"program_id": {"type": "integer"}},
+        },
+    },
 ]
 
 
@@ -1511,6 +1707,53 @@ def dispatch(name: str, args: dict) -> Any:
 
     elif name == "bb_delete_note":
         return api_delete(f"/notes/{args['id']}")
+
+    elif name == "bb_get_next_work_item":
+        qs = _qs(args)
+        return api_get(f"/work-queue/next{'?' + qs if qs else ''}")
+
+    elif name == "bb_claim_work_item":
+        return api_post("/work-queue/claim", args)
+
+    elif name == "bb_release_work_item":
+        return api_post("/work-queue/release", args)
+
+    elif name == "bb_save_session":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/sessions", args)
+
+    elif name == "bb_get_session":
+        pid = args.pop("program_id")
+        qs = _qs(args)
+        return api_get(f"/programs/{pid}/sessions/active{'?' + qs if qs else ''}")
+
+    elif name == "bb_list_sessions":
+        pid = args.pop("program_id")
+        qs = _qs(args)
+        return api_get(f"/programs/{pid}/sessions{'?' + qs if qs else ''}")
+
+    elif name == "bb_update_session":
+        sid = args.pop("id")
+        return api_patch(f"/sessions/{sid}", args)
+
+    elif name == "bb_delete_session":
+        return api_delete(f"/sessions/{args['id']}")
+
+    elif name == "bb_batch_add_recon":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/recon/batch", args)
+
+    elif name == "bb_batch_add_endpoints":
+        pid = args.pop("program_id")
+        return api_post(f"/programs/{pid}/endpoints/batch", args)
+
+    elif name == "bb_search_endpoints":
+        pid = args.pop("program_id")
+        qs = _qs(args)
+        return api_get(f"/programs/{pid}/endpoints/search{'?' + qs if qs else ''}")
+
+    elif name == "bb_get_recon_summary":
+        return api_get(f"/programs/{args['program_id']}/recon/summary")
 
     else:
         return {"error": f"Unknown tool: {name}"}

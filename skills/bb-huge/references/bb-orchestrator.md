@@ -20,6 +20,8 @@ When you receive a task, route it to the correct reference file before acting:
 | "create or look up a program", "add recon to a program" | → Stay in `SKILL.md` (MCP tools) |
 | "log an observation or hypothesis", "attach evidence" | → Stay in `SKILL.md` (MCP tools) |
 | "promote observation to hypothesis" / "promote hypothesis to finding" | → Stay in `SKILL.md` (Evidence Pipeline) |
+| "dispatch subagents", "run validator/report-writer in parallel", "split this across specialists" | → `bb-multiagent-orchestration.md` |
+| "browse the site", "explore the live app", "test behind login", "import a HAR", "get an authenticated session" | → `bb-browser-and-sessions.md` |
 | **Field-aware routing (determine field first)** | → See **Field Routing** below |
 
 **Load only the reference you need.** Do not load all files at once.

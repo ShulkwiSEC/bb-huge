@@ -161,6 +161,27 @@ docker compose up -d
 
 Open [http://localhost:5000](http://localhost:5000) — enter your `DEV_KEY`.
 
+#### Install the recon toolkit (subfinder, httpx, katana, gau, nuclei, etc.)
+
+Needed for the "Restart Automatic Scripts" Danger Zone button and
+`bb-import-*` scripts. One command, works in Docker or standalone, no
+root/sudo required (installs entirely under your home directory):
+
+```bash
+# Inside the Docker container:
+docker compose exec bb-huge bash assets/scripts/bb-install-tools.sh
+
+# Or standalone (no Docker), on your own Debian/Ubuntu/WSL machine:
+bash assets/scripts/bb-install-tools.sh
+```
+
+Idempotent — re-run any time to update tools or retry failures. Installs
+Go itself if missing, then the ProjectDiscovery + tomnomnom recon toolkit
+(subfinder, httpx, katana, dnsx, naabu, nuclei, notify, waybackurls,
+assetfinder, gf, anew, unfurl, qsreplace, gau, ffuf, amass). Tools persist
+across container recreation via the `bb_huge_go_local`/`bb_huge_go_path`
+volumes in `docker-compose.yml`.
+
 </details>
 
 <details>

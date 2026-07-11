@@ -458,10 +458,41 @@ header automatically — no extra setup needed.
 | `bb_batch_add_assets` | **Batch-create multiple assets at once** — use during init instead of calling bb_add_asset repeatedly |
 | `bb_get_scope_history` | Show all assets with version numbers and deprecation info |
 | `bb_bump_asset_version` | Bump version counter after scope changes; optionally deprecate assets |
-| `bb_list_endpoints` | Browse API routes under an asset |
-| `bb_add_endpoint` | Document URL path with method, auth info |
+| `bb_list_endpoints` | Browse API routes under an asset (supports `q`/`limit`/`offset`) |
+| `bb_add_endpoint` | Document a single URL path with method, auth info |
 | `bb_update_endpoint` | Fix path or metadata |
 | `bb_delete_endpoint` | Remove stale endpoint |
+| `bb_batch_add_recon` | **Bulk-import recon entries from real tool output** — use instead of many `bb_add_recon` calls |
+| `bb_batch_add_endpoints` | **Bulk-import endpoints from a URL list** — auto-creates the parent Asset by hostname |
+| `bb_search_endpoints` | Cross-asset path search, bounded by `limit`/`offset` — use instead of dumping the whole endpoint table |
+| `bb_get_recon_summary` | Counts only (recon/assets/endpoints) — check this before running your own recon or listing everything |
+
+### Work Queue (Multi-Agent Orchestration)
+
+| Tool | When to use |
+|------|-------------|
+| `bb_get_next_work_item` | Find the oldest unclaimed observation/hypothesis/finding ready for triage/validate/report |
+| `bb_claim_work_item` | Claim it before dispatching a subagent, so parallel dispatches don't collide |
+| `bb_release_work_item` | Release a claim if the dispatched subagent failed or timed out |
+
+Splitting a hunt across specialist subagents (recon/validate/report in
+parallel instead of one linear session)? See
+`references/bb-multiagent-orchestration.md` for the full coordinator loop.
+
+### Browser Sessions (Authenticated Testing)
+
+| Tool | When to use |
+|------|-------------|
+| `bb_save_session` | Save/refresh a captured session (usually called by `bb-import-har.py`, not directly) |
+| `bb_get_session` | **Get real cookies/headers for a program+label before any authenticated request** — never handle login yourself |
+| `bb_list_sessions` | See which identities (labels) have been captured for a program |
+| `bb_update_session` | Mark a session `status="invalid"` after a 401/redirect-to-login |
+| `bb_delete_session` | Remove a captured session |
+
+Only testing the unauthenticated surface, or curl-guessing endpoints from
+obfuscated JS? Stop — see `references/bb-browser-and-sessions.md` for real
+browser navigation (browsermcp) and how one HAR import gives every agent a
+reusable authenticated session.
 
 ### Configuration & Initialization
 

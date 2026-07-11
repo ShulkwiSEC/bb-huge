@@ -10,6 +10,8 @@ from ..models import (
     AGENTS,
     ASSET_ENVIRONMENTS,
     ASSET_KINDS,
+    AUTH_SESSION_STATUSES,
+    AUTH_SESSION_TYPES,
     CONFIDENCE_LEVELS,
     ENDPOINT_PROTOCOLS,
     EVIDENCE_TYPES,
@@ -23,6 +25,7 @@ from ..models import (
     STATUSES,
     WEBHOOK_EVENTS,
     Asset,
+    AuthSession,
     Attachment,
     Endpoint,
     EvidenceRecord,
@@ -866,6 +869,107 @@ def delete_credential(cid):
     return jsonify({"deleted": True})
 
 
+# ── Auth Sessions (browser-captured, reusable across agents) ──────────────────
+#
+# Populated by skills/bb-huge/scripts/bb-import-har.py after someone logs in
+# via a real browser (browsermcp) and exports a HAR. Any other agent calls
+# GET .../sessions/active to get ready-to-use cookies/headers instead of
+# handling login/MFA/CSRF itself. One row per (program_id, label) — saving
+# again with the same label upserts in place. See
+# skills/bb-huge/references/bb-multiagent-orchestration.md for the SOP.
+
+
+@api_bp.get("/programs/<int:pid>/sessions")
+@api_key_required
+def list_sessions(pid):
+    _require_program(pid)
+    include_secret = request.args.get("include_secret") == "1"
+    sessions = AuthSession.query.filter_by(program_id=pid).order_by(AuthSession.label).all()
+    return jsonify([s.to_dict(include_secret=include_secret) for s in sessions])
+
+
+@api_bp.post("/programs/<int:pid>/sessions")
+@api_key_required
+def save_session(pid):
+    _require_program(pid)
+    data = request.get_json(force=True) or {}
+    label = (data.get("label") or "default").strip() or "default"
+
+    auth_type = data.get("auth_type", "cookie")
+    err = _validate_from_data(auth_type, "auth_type", AUTH_SESSION_TYPES)
+    if err:
+        return err
+
+    session_row = AuthSession.query.filter_by(program_id=pid, label=label).first()
+    if session_row is None:
+        session_row = AuthSession(program_id=pid, label=label)
+        db.session.add(session_row)
+
+    session_row.base_url = data.get("base_url", session_row.base_url)
+    session_row.auth_type = auth_type
+    session_row.cookies_encrypted = _json_text(data.get("cookies"))
+    session_row.headers_encrypted = _json_text(data.get("headers"))
+    session_row.status = "active"
+    session_row.captured_by = data.get("captured_by")
+    session_row.source = data.get("source", "har_import")
+    session_row.notes = data.get("notes", session_row.notes or "")
+    session_row.captured_at = datetime.now(timezone.utc)
+    session_row.expires_at = _parse_datetime(data.get("expires_at"))
+    _touch(session_row)
+    _save()
+    return jsonify(session_row.to_dict(include_secret=True)), 201
+
+
+@api_bp.get("/programs/<int:pid>/sessions/active")
+@api_key_required
+def get_active_session(pid):
+    _require_program(pid)
+    label = (request.args.get("label") or "default").strip() or "default"
+    session_row = AuthSession.query.filter_by(program_id=pid, label=label).first()
+    if session_row is None:
+        return jsonify({"error": f"no session captured for label '{label}'"}), 404
+    return jsonify(session_row.to_dict(include_secret=True))
+
+
+@api_bp.patch("/sessions/<int:sid>")
+@api_key_required
+def update_session(sid):
+    session_row = AuthSession.query.get_or_404(sid)
+    data = request.get_json(force=True) or {}
+
+    _apply_fields(session_row, data, ["base_url", "captured_by", "source", "notes"])
+
+    if "status" in data:
+        err = _validate_from_data(data, "status", AUTH_SESSION_STATUSES)
+        if err:
+            return err
+        session_row.status = data["status"]
+
+    if "auth_type" in data:
+        err = _validate_from_data(data, "auth_type", AUTH_SESSION_TYPES)
+        if err:
+            return err
+        session_row.auth_type = data["auth_type"]
+
+    if "cookies" in data:
+        session_row.cookies_encrypted = _json_text(data["cookies"])
+    if "headers" in data:
+        session_row.headers_encrypted = _json_text(data["headers"])
+
+    _touch(session_row)
+    _save()
+    return jsonify(session_row.to_dict(include_secret=True))
+
+
+@api_bp.delete("/sessions/<int:sid>")
+@api_key_required
+def delete_session(sid):
+    session_row = AuthSession.query.get_or_404(sid)
+    db.session.delete(session_row)
+    _save()
+    return jsonify({"deleted": True})
+
+
 # ── Alert Rules ─────────────────────────────────────────────────────────────────
 
 
@@ -1137,10 +1241,19 @@ def get_program_brief(pid):
 @api_key_required
 def list_recon(pid):
     category = request.args.get("category", "")
+    q = request.args.get("q", "").strip()
     query = ReconEntry.query.filter_by(program_id=pid)
     if category:
         query = query.filter_by(category=category)
-    entries = query.order_by(ReconEntry.category, ReconEntry.created_at.desc()).all()
+    if q:
+        query = query.filter(ReconEntry.value.contains(q))
+    offset = request.args.get("offset", 0, type=int)
+    entries = (
+        query.order_by(ReconEntry.category, ReconEntry.created_at.desc())
+        .offset(offset)
+        .limit(_limit_arg())
+        .all()
+    )
     return jsonify([entry.to_dict() for entry in entries])
 
 
@@ -1161,6 +1274,111 @@ def add_recon(pid):
     )
     _save(recon_entry)
     return jsonify(recon_entry.to_dict()), 201
+
+
+def _import_recon_entries(program_id, entries_data):
+    """Shared by the /recon/batch route and the background recon runner
+    (app/recon_runner.py) — same dedup/creation logic either way."""
+    existing = {
+        (category, value)
+        for category, value in db.session.query(ReconEntry.category, ReconEntry.value).filter_by(program_id=program_id)
+    }
+
+    created = []
+    errors = []
+    skipped = 0
+    for idx, entry_data in enumerate(entries_data):
+        value = (entry_data.get("value") or "").strip()
+        if not value:
+            errors.append({"index": idx, "error": "value is required"})
+            continue
+
+        category = entry_data.get("category", "subdomain")
+        if category not in RECON_CATEGORIES:
+            errors.append({"index": idx, "error": f"category must be one of {RECON_CATEGORIES}"})
+            continue
+
+        if (category, value) in existing:
+            skipped += 1
+            continue
+        existing.add((category, value))
+
+        recon_entry = ReconEntry(
+            program_id=program_id,
+            category=category,
+            value=value,
+            notes=entry_data.get("notes", ""),
+            source=entry_data.get("source", ""),
+        )
+        db.session.add(recon_entry)
+        created.append(recon_entry)
+
+    if created:
+        _save()
+
+    return created, errors, skipped
+
+
+@api_bp.post("/programs/<int:pid>/recon/batch")
+@api_key_required
+def create_recon_batch(pid):
+    """Bulk-import recon entries (subdomains, params, tech, etc.) from
+    external tool output. Skips entries that duplicate an existing
+    (program_id, category, value) row instead of erroring, since imports
+    get re-run on overlapping tool output."""
+    _require_program(pid)
+    data = request.get_json(force=True) or {}
+    entries_data = data.get("entries", [])
+    if not entries_data or not isinstance(entries_data, list):
+        return jsonify({"error": "entries list is required"}), 400
+
+    created, errors, skipped = _import_recon_entries(pid, entries_data)
+
+    return jsonify({
+        "created": [entry.to_dict() for entry in created],
+        "errors": errors,
+        "total_created": len(created),
+        "total_skipped_duplicates": skipped,
+        "total_errors": len(errors),
+    }), 201 if created else 400
+
+
+@api_bp.get("/programs/<int:pid>/recon/summary")
+@api_key_required
+def get_recon_summary(pid):
+    """Counts only, no rows — the shape of the haystack before drilling
+    into a bounded search."""
+    _require_program(pid)
+
+    recon_by_category = dict(
+        db.session.query(ReconEntry.category, db.func.count(ReconEntry.id))
+        .filter_by(program_id=pid)
+        .group_by(ReconEntry.category)
+        .all()
+    )
+    assets_by_kind = dict(
+        db.session.query(Asset.kind, db.func.count(Asset.id))
+        .filter_by(program_id=pid)
+        .group_by(Asset.kind)
+        .all()
+    )
+    endpoints_by_method = dict(
+        db.session.query(Endpoint.method, db.func.count(Endpoint.id))
+        .join(Asset, Endpoint.asset_id == Asset.id)
+        .filter(Asset.program_id == pid)
+        .group_by(Endpoint.method)
+        .all()
+    )
+
+    return jsonify({
+        "program_id": pid,
+        "recon_by_category": recon_by_category,
+        "recon_total": sum(recon_by_category.values()),
+        "assets_by_kind": assets_by_kind,
+        "assets_total": sum(assets_by_kind.values()),
+        "endpoints_by_method": endpoints_by_method,
+        "endpoints_total": sum(endpoints_by_method.values()),
+    })
 
 
 @api_bp.delete("/recon/<int:rid>")
@@ -1476,6 +1694,94 @@ def promote_hypothesis(hid):
     return jsonify({"hypothesis": hypothesis.to_dict(), "finding": finding.to_dict()}), 201
 
 
+# ── Work queue (multi-agent orchestration) ────────────────────────────────────
+#
+# Generic claim mechanism over the three pipeline stages so a coordinator
+# session can dispatch specialist subagents (recon/validate/report) without
+# two dispatches grabbing the same item. See
+# skills/bb-huge/references/bb-multiagent-orchestration.md for the SOP.
+
+_WORK_QUEUE_MODELS = {
+    "triage": Observation,
+    "validate": Hypothesis,
+    "report": Finding,
+}
+
+
+def _work_queue_ready(kind, query):
+    if kind == "triage":
+        return query.filter_by(status="open")
+    if kind == "validate":
+        return query.filter(Hypothesis.status.in_(["open", "testing"]))
+    if kind == "report":
+        return query.filter_by(status="confirmed")
+    return query
+
+
+@api_bp.get("/work-queue/next")
+@api_key_required
+def work_queue_next():
+    kind = request.args.get("kind", "").strip()
+    if kind not in _WORK_QUEUE_MODELS:
+        return jsonify({"error": f"kind must be one of {list(_WORK_QUEUE_MODELS)}"}), 400
+
+    model = _WORK_QUEUE_MODELS[kind]
+    query = _work_queue_ready(kind, model.query.filter(model.claimed_by.is_(None)))
+
+    program_id = request.args.get("program_id", type=int)
+    if program_id:
+        query = query.filter_by(program_id=program_id)
+
+    item = query.order_by(model.updated_at.asc()).first()
+    return jsonify({"kind": kind, "item": item.to_dict() if item else None})
+
+
+@api_bp.post("/work-queue/claim")
+@api_key_required
+def work_queue_claim():
+    data = request.get_json(force=True) or {}
+    kind = data.get("kind", "")
+    if kind not in _WORK_QUEUE_MODELS:
+        return jsonify({"error": f"kind must be one of {list(_WORK_QUEUE_MODELS)}"}), 400
+    err = _require_fields(data, "id", "claimed_by")
+    if err:
+        return err
+
+    model = _WORK_QUEUE_MODELS[kind]
+    updated = (
+        db.session.query(model)
+        .filter(model.id == data["id"], model.claimed_by.is_(None))
+        .update({"claimed_by": data["claimed_by"], "claimed_at": datetime.now(timezone.utc)})
+    )
+    db.session.commit()
+
+    if not updated:
+        item = model.query.get_or_404(data["id"])
+        return jsonify({"error": "already claimed", "claimed_by": item.claimed_by}), 409
+
+    item = model.query.get(data["id"])
+    return jsonify({"kind": kind, "item": item.to_dict()})
+
+
+@api_bp.post("/work-queue/release")
+@api_key_required
+def work_queue_release():
+    data = request.get_json(force=True) or {}
+    kind = data.get("kind", "")
+    if kind not in _WORK_QUEUE_MODELS:
+        return jsonify({"error": f"kind must be one of {list(_WORK_QUEUE_MODELS)}"}), 400
+    err = _require_fields(data, "id")
+    if err:
+        return err
+
+    model = _WORK_QUEUE_MODELS[kind]
+    item = model.query.get_or_404(data["id"])
+    item.claimed_by = None
+    item.claimed_at = None
+    _save()
+    return jsonify({"kind": kind, "item": item.to_dict()})
+
+
 @api_bp.get("/programs/<int:pid>/evidence")
 @api_key_required
 def list_evidence(pid):
@@ -1614,10 +1920,19 @@ def update_evidence(eid):
 def list_assets(pid):
     _require_program(pid)
     kind = request.args.get("kind", "").strip()
+    q = request.args.get("q", "").strip()
     query = Asset.query.filter_by(program_id=pid)
     if kind:
         query = query.filter_by(kind=kind)
-    assets = query.order_by(Asset.kind, Asset.identifier).all()
+    if q:
+        query = query.filter(Asset.identifier.contains(q))
+    offset = request.args.get("offset", 0, type=int)
+    assets = (
+        query.order_by(Asset.kind, Asset.identifier)
+        .offset(offset)
+        .limit(_limit_arg())
+        .all()
+    )
     return jsonify([asset.to_dict() for asset in assets])
 
 
@@ -1743,11 +2058,146 @@ def delete_asset(aid):
 def list_endpoints(aid):
     Asset.query.get_or_404(aid)
     method = request.args.get("method", "").strip()
+    q = request.args.get("q", "").strip()
     query = Endpoint.query.filter_by(asset_id=aid)
     if method:
         query = query.filter_by(method=method)
-    endpoints = query.order_by(Endpoint.method, Endpoint.path).all()
+    if q:
+        query = query.filter(Endpoint.path.contains(q))
+    offset = request.args.get("offset", 0, type=int)
+    endpoints = (
+        query.order_by(Endpoint.method, Endpoint.path)
+        .offset(offset)
+        .limit(_limit_arg())
+        .all()
+    )
     return jsonify([endpoint.to_dict() for endpoint in endpoints])
+
+
+@api_bp.get("/programs/<int:pid>/endpoints/search")
+@api_key_required
+def search_endpoints(pid):
+    """Cross-asset endpoint search — for when you don't already know which
+    asset to look under. Bounded by limit/offset; never returns the whole
+    table (see bb-recon.md)."""
+    _require_program(pid)
+    q = request.args.get("q", "").strip()
+    method = request.args.get("method", "").strip()
+
+    query = Endpoint.query.join(Asset, Endpoint.asset_id == Asset.id).filter(Asset.program_id == pid)
+    if method:
+        query = query.filter(Endpoint.method == method)
+    if q:
+        query = query.filter(Endpoint.path.contains(q))
+
+    offset = request.args.get("offset", 0, type=int)
+    endpoints = (
+        query.order_by(Endpoint.method, Endpoint.path)
+        .offset(offset)
+        .limit(_limit_arg())
+        .all()
+    )
+    return jsonify([endpoint.to_dict() for endpoint in endpoints])
+
+
+def _import_endpoints(program_id, endpoints_data, default_asset_kind="subdomain"):
+    """Shared by the /endpoints/batch route and the background recon runner
+    (app/recon_runner.py) — same auto-asset-creation/dedup logic either way.
+    Returns (created, errors, skipped, kind_error). kind_error is set if
+    default_asset_kind itself is invalid (checked once, not per-row)."""
+    if default_asset_kind not in ASSET_KINDS:
+        return [], [], 0, f"default_asset_kind must be one of {ASSET_KINDS}"
+
+    assets_by_identifier = {
+        asset.identifier: asset for asset in Asset.query.filter_by(program_id=program_id).all()
+    }
+    existing_endpoints = {
+        (asset_id, method, path)
+        for asset_id, method, path in db.session.query(Endpoint.asset_id, Endpoint.method, Endpoint.path)
+        .join(Asset, Endpoint.asset_id == Asset.id)
+        .filter(Asset.program_id == program_id)
+    }
+
+    created = []
+    errors = []
+    skipped = 0
+    for idx, entry_data in enumerate(endpoints_data):
+        identifier = (entry_data.get("identifier") or "").strip()
+        path = (entry_data.get("path") or "").strip()
+        if not identifier or not path:
+            errors.append({"index": idx, "error": "identifier and path are required"})
+            continue
+
+        method = entry_data.get("method", "GET")
+        protocol = entry_data.get("protocol", "https")
+        if protocol not in ENDPOINT_PROTOCOLS:
+            errors.append({"index": idx, "error": f"protocol must be one of {ENDPOINT_PROTOCOLS}"})
+            continue
+
+        asset = assets_by_identifier.get(identifier)
+        if asset is None:
+            asset = Asset(
+                program_id=program_id,
+                kind=default_asset_kind,
+                identifier=identifier,
+                environment="unknown",
+            )
+            db.session.add(asset)
+            db.session.flush()  # assign asset.id without a full commit
+            assets_by_identifier[identifier] = asset
+
+        key = (asset.id, method, path)
+        if key in existing_endpoints:
+            skipped += 1
+            continue
+        existing_endpoints.add(key)
+
+        endpoint = Endpoint(
+            asset_id=asset.id,
+            method=method,
+            path=path,
+            protocol=protocol,
+            content_type=entry_data.get("content_type"),
+            auth_required=entry_data.get("auth_required"),
+            discovered_by=entry_data.get("discovered_by"),
+            notes=entry_data.get("notes", ""),
+        )
+        db.session.add(endpoint)
+        created.append(endpoint)
+
+    # Always commit, even if every endpoint was a duplicate — an auto-created
+    # Asset for a previously-untracked host must still persist.
+    db.session.commit()
+
+    return created, errors, skipped, None
+
+
+@api_bp.post("/programs/<int:pid>/endpoints/batch")
+@api_key_required
+def create_endpoints_batch(pid):
+    """Bulk-import endpoints from external tool output (katana/gau/
+    waybackurls-style URL lists). Auto-resolves/creates the parent Asset by
+    `identifier` (hostname) if it doesn't exist yet — the import script
+    hands over raw host+path, not pre-resolved asset ids. Skips entries
+    that duplicate an existing (asset_id, method, path) row."""
+    _require_program(pid)
+    data = request.get_json(force=True) or {}
+    endpoints_data = data.get("endpoints", [])
+    if not endpoints_data or not isinstance(endpoints_data, list):
+        return jsonify({"error": "endpoints list is required"}), 400
+
+    default_asset_kind = data.get("default_asset_kind", "subdomain")
+    created, errors, skipped, kind_error = _import_endpoints(pid, endpoints_data, default_asset_kind)
+    if kind_error:
+        return jsonify({"error": kind_error}), 400
+
+    return jsonify({
+        "created": [endpoint.to_dict() for endpoint in created],
+        "errors": errors,
+        "total_created": len(created),
+        "total_skipped_duplicates": skipped,
+        "total_errors": len(errors),
+    }), 201 if created else 400
 
 
 @api_bp.post("/assets/<int:aid>/endpoints")

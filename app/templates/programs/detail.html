@@ -133,7 +133,17 @@
     background:rgba(0,0,0,.18); border:1px solid var(--border); border-radius:8px; padding:12px;
   }
   .danger-zone { border:1px solid rgba(255,77,109,.2); border-radius:10px; padding:16px 20px; margin-top:24px; }
-  .danger-zone h3 { font-size:13px; color:var(--critical); margin-bottom:10px; }
+  .danger-zone-title {
+    font-size:11px; font-weight:700; color:var(--critical); text-transform:uppercase;
+    letter-spacing:.5px; margin-bottom:14px; display:flex; align-items:center; gap:7px;
+  }
+  .danger-row {
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:14px 16px; background:rgba(255,255,255,.02); border:1px solid var(--border);
+    border-radius:8px; margin-bottom:12px;
+  }
+  .danger-row:last-of-type { margin-bottom:0; }
+  .danger-row-title { font-weight:600; font-size:13px; margin-bottom:4px; }
 
   /* ─── Brief Tab — redesigned ─────────────────────────────── */
   .brief-layout {
@@ -361,6 +371,32 @@
   /* Briefs grid — legacy keep (used in other tabs) */
   .brief-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:16px; }
   @media(max-width:900px){ .brief-grid { grid-template-columns:1fr; } }
+
+  /* ─── Logs Tab ───────────────────────────────────────────── */
+  .log-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
+  .log-card.status-running { border-color:rgba(107,188,255,.35); }
+  .log-card.status-failed { border-color:rgba(255,77,109,.3); }
+  .log-card.status-completed_with_errors { border-color:rgba(255,209,102,.3); }
+  .log-status-badge { font-size:10px; padding:2px 8px; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+  .log-status-badge.running { background:rgba(107,188,255,.14); color:#6bbcff; border:1px solid rgba(107,188,255,.25); }
+  .log-status-badge.completed { background:rgba(6,214,160,.14); color:#06d6a0; border:1px solid rgba(6,214,160,.25); }
+  .log-status-badge.completed_with_errors { background:rgba(255,209,102,.14); color:#ffd166; border:1px solid rgba(255,209,102,.25); }
+  .log-status-badge.failed { background:rgba(255,77,109,.14); color:#ff4d6d; border:1px solid rgba(255,77,109,.25); }
+  .log-summary, .log-error {
+    font-family:var(--mono); font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere;
+    background:rgba(0,0,0,.18); border:1px solid var(--border); border-radius:6px;
+    padding:10px 12px; margin-top:10px;
+  }
+  .log-error { color:#ff8ba0; border-color:rgba(255,77,109,.2); background:rgba(255,77,109,.05); }
+
+  /* ─── Confirm modal (shared with restart-scripts) ───────── */
+  .confirm-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:1000; align-items:center; justify-content:center; }
+  .confirm-modal-box { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:0; max-width:380px; width:90%; overflow:hidden; }
+  .confirm-modal-head {
+    padding:12px 16px; border-bottom:1px solid rgba(255,77,109,.2); background:rgba(255,77,109,.05);
+    font-size:11px; font-weight:700; color:var(--critical); text-transform:uppercase; letter-spacing:.5px;
+  }
+  .confirm-modal-body { padding:16px; }
 </style>
 {% endblock %}
 
@@ -418,6 +454,7 @@
       <button class="tab-btn" onclick="showTab('hypotheses',this)" id="hypotheses-tab-btn">Hypotheses<span class="tab-count">{{ hypotheses|length }}</span></button>
       <button class="tab-btn" onclick="showTab('evidence',this)" id="evidence-tab-btn">Evidence<span class="tab-count">{{ evidence_records|length }}</span></button>
       <button class="tab-btn" onclick="showTab('recon',this)" id="recon-tab-btn">Recon<span class="tab-count">{{ program.recon|length }}</span></button>
+      <button class="tab-btn" onclick="showTab('logs',this)" id="logs-tab-btn">Logs<span class="tab-count">{{ recon_jobs|length }}</span></button>
       <button class="tab-btn" onclick="showTab('scope',this)">Scope</button>
       <button class="tab-btn" onclick="showTab('notes',this)">Notes</button>
     </div>
@@ -963,6 +1000,44 @@
 
 
     <!-- ═══════════════════════════════════════════════════════
+         LOGS TAB — "Restart Automatic Scripts" run history
+    ════════════════════════════════════════════════════════ -->
+    <div id="tab-logs" class="tab-panel">
+      <p class="tiny" style="margin-bottom:14px">
+        Every "Restart Automatic Scripts" run, most recent first. Each entry
+        shows exactly what subfinder/gau found per domain — if a run says
+        "0 new" that's not a bug, it means the tools ran fine but found
+        nothing your portal doesn't already have.
+      </p>
+      {% if recon_jobs %}
+        {% for job in recon_jobs %}
+          <div class="log-card status-{{ job.status }}">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+              <div>
+                <span class="log-status-badge {{ job.status }}">{{ job.status.replace('_', ' ') }}</span>
+                <span class="mono-tiny" style="margin-left:8px">#{{ job.id }}</span>
+              </div>
+              <div class="meta-line" style="margin-top:0">
+                {% if job.triggered_by %}<span class="tiny">triggered by: {{ job.triggered_by }}</span>{% endif %}
+                <span class="tiny">started {{ job.started_at.strftime('%Y-%m-%d %H:%M:%S') if job.started_at }}</span>
+                {% if job.finished_at %}<span class="tiny">finished {{ job.finished_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>{% endif %}
+              </div>
+            </div>
+            {% if job.summary %}
+              <div class="log-summary">{{ job.summary }}</div>
+            {% endif %}
+            {% if job.error %}
+              <div class="log-error">{{ job.error }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="muted-box">No script runs yet. Use "Restart Automatic Scripts" in the Danger Zone below to run subfinder/gau against this program's domain assets.</div>
+      {% endif %}
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════════
          SCOPE TAB — unchanged
     ════════════════════════════════════════════════════════ -->
     <div id="tab-scope" class="tab-panel">
@@ -1003,11 +1078,64 @@
   </div><!-- /card -->
 
   <div class="danger-zone">
-    <h3>⚠ Danger Zone</h3>
-    <form method="POST" action="{{ url_for('programs.delete_program', pid=program.id) }}"
-          onsubmit="return confirm('Delete program and all its recon data? Findings will be unlinked, not deleted.')">
-      <button type="submit" class="btn btn-danger btn-sm">Delete Program</button>
-    </form>
+    <div class="danger-zone-title">⚠ Danger Zone</div>
+
+    <div class="danger-row">
+      <div>
+        <div class="danger-row-title">Restart Automatic Scripts</div>
+        <div id="recon-job-status" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          {% if recon_job %}
+            <span class="log-status-badge {{ recon_job.status }}">{{ recon_job.status.replace('_', ' ') }}</span>
+            <span class="tiny">
+              {% if recon_job.status == 'running' %}
+                since {{ recon_job.started_at.strftime('%Y-%m-%d %H:%M') if recon_job.started_at }}
+              {% else %}
+                {{ recon_job.finished_at.strftime('%Y-%m-%d %H:%M') if recon_job.finished_at }}
+              {% endif %}
+            </span>
+            <a href="#logs" onclick="document.getElementById('logs-tab-btn').click()" class="tiny" style="color:var(--accent2)">view logs →</a>
+          {% else %}
+            <span class="tiny">Never run.</span>
+          {% endif %}
+        </div>
+      </div>
+      <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('restart-scripts-modal').style.display='flex'">
+        Restart Automatic Scripts
+      </button>
+    </div>
+
+    <div class="danger-row">
+      <div>
+        <div class="danger-row-title">Delete Program</div>
+        <div class="tiny">Removes recon data permanently. Findings will be unlinked, not deleted.</div>
+      </div>
+      <form method="POST" action="{{ url_for('programs.delete_program', pid=program.id) }}"
+            onsubmit="return confirm('Delete program and all its recon data? Findings will be unlinked, not deleted.')">
+        <button type="submit" class="btn btn-danger btn-sm">Delete Program</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Restart Automatic Scripts — dev-key reconfirmation modal -->
+<div id="restart-scripts-modal" class="confirm-modal">
+  <div class="confirm-modal-box">
+    <div class="confirm-modal-head">Confirm: Restart Automatic Scripts</div>
+    <div class="confirm-modal-body">
+      <p class="tiny" style="margin-bottom:12px">
+        This re-runs subfinder and gau against this program's domain assets
+        and imports fresh subdomains/endpoints in the background. Re-enter
+        your dev key to confirm.
+      </p>
+      <form method="POST" action="{{ url_for('programs.restart_scripts', pid=program.id) }}">
+        <input type="password" name="confirm_key" placeholder="Dev key" required autocomplete="off"
+               style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);margin-bottom:12px">
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('restart-scripts-modal').style.display='none'">Cancel</button>
+          <button type="submit" class="btn btn-danger btn-sm">Confirm Restart</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -1043,11 +1171,28 @@
     '#observations': 'observations-tab-btn',
     '#hypotheses': 'hypotheses-tab-btn',
     '#evidence': 'evidence-tab-btn',
-    '#assets': 'assets-tab-btn'
+    '#assets': 'assets-tab-btn',
+    '#logs': 'logs-tab-btn'
   };
   const btnId = hashToTab[window.location.hash];
   if (btnId) {
     document.getElementById(btnId)?.click();
   }
+
+  // Poll recon job status while a "Restart Automatic Scripts" run is in flight.
+  {% if recon_job and recon_job.status == 'running' %}
+  (function pollReconJob() {
+    fetch("{{ url_for('programs.scripts_status', pid=program.id) }}")
+      .then(r => r.json())
+      .then(job => {
+        if (job.status === 'running') {
+          setTimeout(pollReconJob, 4000);
+        } else {
+          window.location.reload();
+        }
+      })
+      .catch(() => {});
+  })();
+  {% endif %}
 </script>
 {% endblock %}

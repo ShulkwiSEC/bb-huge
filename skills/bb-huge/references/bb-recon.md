@@ -16,6 +16,10 @@ tools as everyone else on the same scope.
 Log everything into bb-huge as you go. A recon note today becomes
 a confirmed finding next week.
 
+**Missing a tool below?** Run `assets/scripts/bb-install-tools.sh`
+(works inside Docker via `docker compose exec bb-huge bash ...`, or
+standalone — no root needed) to install the whole toolkit in one shot.
+
 ---
 
 ## Phase 1 — Passive Recon (no direct interaction)
@@ -128,11 +132,36 @@ For each auth endpoint, note:
 
 ## Recon Output → bb-huge
 
-Recon data has two homes in bb-huge, depending on maturity:
+**Before running any recon yourself, check what's already there:**
+`bb_get_recon_summary(program_id)` returns counts by category/kind/method —
+if the user has already run subfinder/katana/etc. themselves and imported
+the output, don't re-discover the same data one MCP call at a time.
 
-### A. Structured Recon Entries (use `bb_add_recon`)
+### Bulk import (when you have real tool output — this is the default)
 
-For individual assets discovered during recon, add them directly to the program:
+Subdomain lists and URL lists from real tools get large fast. Never call
+`bb_add_recon`/`bb_add_endpoint` in a loop for tool output — use the batch
+scripts instead, which also auto-create the parent Asset for you:
+
+```bash
+python skills/bb-huge/scripts/bb-import-subdomains.py all_subs.txt --program-id 1 --source subfinder
+python skills/bb-huge/scripts/bb-import-endpoints.py wayback_urls.txt --program-id 1 --discovered-by waybackurls
+```
+
+Or from the agent directly (no file needed) with `bb_batch_add_recon` /
+`bb_batch_add_endpoints` — same dedup semantics, pass the list inline.
+
+**Exploring afterward: always filter/paginate, never dump the whole table.**
+Once a program has thousands of recon entries or endpoints, an unfiltered
+`bb_list_recon`/`bb_list_endpoints` would try to hand the entire table to
+you at once. Use `bb_search_endpoints(program_id, q=...)` for cross-asset
+path search, or `q=`/`limit=`/`offset=` on `bb_list_recon`/`bb_list_assets`.
+This is deliberately not a vector/semantic search — it's structured data,
+plain filtering is the right tool.
+
+### A. Structured Recon Entries (use `bb_add_recon` for one-off finds)
+
+For a single asset discovered ad hoc (not from a bulk tool run), add it directly:
 
 ```bash
 bb_add_recon(program_id=1, category="subdomain", value="admin.example.com", source="subfinder")

@@ -13,6 +13,12 @@ services:
     volumes:
       # Persist the database
       - bb_huge_db:/app/instance
+      # Persist the recon toolkit installed by
+      # assets/scripts/bb-install-tools.sh (Go toolchain + compiled
+      # tools + module cache) so a container recreation doesn't force a
+      # full reinstall — only removed by `docker compose down -v`.
+      - bb_huge_go_local:/home/bbhuge/.local
+      - bb_huge_go_path:/home/bbhuge/go
       # Hot-reload mounts — source code reflected instantly
       - ./app:/app/app
       - ./skills:/app/skills
@@ -25,3 +31,5 @@ services:
 
 volumes:
   bb_huge_db:
+  bb_huge_go_local:
+  bb_huge_go_path:

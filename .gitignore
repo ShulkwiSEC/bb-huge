@@ -26,3 +26,4 @@ bb_huge_dataset_genrator_for_fine_tune.py
 UPGRADE_EXPLAINER.md
 .tmp
 *tmp
+docs
